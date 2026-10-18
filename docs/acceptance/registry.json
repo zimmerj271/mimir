@@ -1,0 +1,910 @@
+{
+  "schema_version": 1,
+  "requirements": [
+    {
+      "id": "DEPLOY-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T02",
+        "DEPLOY-01"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DEPLOY-02",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "DEPLOY-01",
+        "T41"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DEPLOY-03",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T37",
+        "DEPLOY-01"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DB-ROLE-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T03",
+        "T40"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DB-MIG-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T07",
+        "T40"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "API-SESSION-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T08",
+        "T24"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "API-CREATE-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T11",
+        "T26"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "RUN-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T16",
+        "T27"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "SSE-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T18",
+        "CLI-14"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T31",
+        "T29"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-02",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T33",
+        "T34"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-03",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T34",
+        "CLI-16A"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CLI-CMD-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "CLI-08",
+        "CLI-16A"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CLI-CTX-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "CLI-06",
+        "CLI-16A"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CLI-REC-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "CLI-07",
+        "CLI-16A"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CLI-TUI-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "CLI-10",
+        "CLI-16B"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CLI-TUI-02",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "CLI-12A",
+        "CLI-16B"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CLI-TUI-03",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "CLI-12B",
+        "CLI-16B"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CLI-CFG-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "CLI-04",
+        "CLI-16A"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "LIFECYCLE-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T35",
+        "T40"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "LIFECYCLE-02",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T36",
+        "T40"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "INFER-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "T13",
+        "T28"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "GOV-01",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "S00",
+        "T41"
+      ],
+      "tests": [
+        "tests/governance/test_checks.py"
+      ],
+      "kind": "unit",
+      "status": "implemented",
+      "last_verified_commit": null,
+      "evidence": "S00 PR command evidence; repository protection and independent/human review require live verification."
+    },
+    {
+      "id": "GOV-02",
+      "source": "docs/acceptance/REQUIREMENTS.md",
+      "owner_tasks": [
+        "S01",
+        "T28"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DB-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DB-02",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DB-03",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DB-04",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DB-05",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DB-06",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "DB-07",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CTX-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T14"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CTX-02",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T14"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CTX-03",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T14"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "INF-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T13",
+        "T14",
+        "T15",
+        "T16"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "INF-02",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T13",
+        "T14",
+        "T15",
+        "T16"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "SSE-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T18",
+        "T27"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "SSE-02",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T18",
+        "T27"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "API-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T09",
+        "T20"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-02",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-03",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-04",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-05",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-06",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-07",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "MEM-08",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "JOB-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T32",
+        "T33"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "JOB-02",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T32",
+        "T33"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "OPS-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T02",
+        "T37",
+        "T39"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "OPS-02",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T02",
+        "T37",
+        "T39"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "SEC-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T08",
+        "T35",
+        "T40"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "SEC-02",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T08",
+        "T35",
+        "T40"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "OBS-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T38"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "E2E-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T28",
+        "CLI-16A"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "PERF-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T39",
+        "CLI-16B"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "AUTH-RENEW-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T24",
+        "CLI-04"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "RUN-STAND-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T21",
+        "T22"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "RUN-STAND-02",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T21",
+        "T22"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "OP-LOOKUP-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T23",
+        "CLI-07"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "OP-LOOKUP-02",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T23",
+        "CLI-07"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "PROJECT-MOVE-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T25",
+        "CLI-05"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "SSE-STAND-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T18",
+        "T27"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CONTRACT-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T20",
+        "T28",
+        "CLI-03"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    },
+    {
+      "id": "CLI-INTEGRATION-01",
+      "source": "backend/ACCEPTANCE_TESTS.md",
+      "owner_tasks": [
+        "T28",
+        "CLI-16A"
+      ],
+      "tests": [],
+      "kind": "not_implemented",
+      "status": "not_implemented",
+      "last_verified_commit": null,
+      "evidence": null
+    }
+  ]
+}

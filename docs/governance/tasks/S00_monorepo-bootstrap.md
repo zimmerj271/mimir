@@ -2,6 +2,8 @@
 
 **Type:** foundation · **Depends on:** none
 
+Acceptance IDs: GOV-01 (docs/acceptance/REQUIREMENTS.md).
+
 ## Scope and deliverables
 Monorepo root tooling, GitHub protection and CI skeleton. Respect approved `docs/decisions/FINAL_V1.md` and component interfaces. S00 delivers root Makefile targets and protected governance/CI scaffolding; S01 checks and freezes the authoritative machine-readable contract, manifests, schema/error/fixture consistency and semantic version. DEPLOY-01 verifies complete local connected installation with PostgreSQL, Qdrant, Flyway, backend, Ollama and native CLI, without remote access. CLI-12A manages viewport anchors and scrolling independently of formatting. CLI-12B manages sanitized Markdown and bounded cache independently of fetching history.
 

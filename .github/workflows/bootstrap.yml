@@ -1,0 +1,42 @@
+name: Bootstrap
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  push:
+    branches: [main, 'feature/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bootstrap-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  foundation:
+    name: foundation (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.14.7'
+      - run: make check
+      - name: PR assignment and evidence
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/check_pr.py "$GITHUB_EVENT_PATH"
+      - name: Component gate status
+        run: |
+          echo 'Backend quality: NOT IMPLEMENTED (T01)'
+          echo 'CLI builds, race and PTY tests: NOT IMPLEMENTED (CLI-01 and successors)'
+          echo 'Contract semantics/producer/consumer tests: NOT IMPLEMENTED (S01 and successors)'
+          echo 'PostgreSQL/Flyway and deployment: NOT IMPLEMENTED (T02 and successors)'
