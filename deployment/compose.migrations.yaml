@@ -1,0 +1,94 @@
+# Explicit operator-only overlay. No migration/admin secrets reach the backend.
+services:
+  role-bootstrap:
+    profiles: [migrations]
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
+    restart: "no"
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    networks: [private]
+    entrypoint: [/bin/sh, /mimir/database/provision.sh]
+    command: [bootstrap]
+    tmpfs: [/tmp:rw,noexec,nosuid,size=16m]
+    secrets: [postgres_bootstrap_password, mimir_migrator_password]
+    volumes:
+      - ./database:/mimir/database:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  flyway:
+    profiles: [migrations]
+    image: flyway/flyway:12.4.0@sha256:5be18367a9b3979a9f37234c371b80da457a448fb9577bd94d4bf24d923fafac
+    restart: "no"
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    networks: [private]
+    entrypoint: [/bin/sh, /mimir/database/flyway.sh]
+    command: [migrate]
+    tmpfs: [/tmp:rw,noexec,nosuid,size=64m]
+    secrets: [mimir_migrator_password]
+    volumes:
+      - ./database/flyway.sh:/mimir/database/flyway.sh:ro
+      - ../backend/migrations:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/mimir
+      FLYWAY_USER: mimir_migrator
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+      FLYWAY_DEFAULT_SCHEMA: public
+      FLYWAY_CREATE_SCHEMAS: "false"
+      FLYWAY_CLEAN_DISABLED: "true"
+      FLYWAY_BASELINE_ON_MIGRATE: "false"
+      FLYWAY_OUT_OF_ORDER: "false"
+      FLYWAY_VALIDATE_ON_MIGRATE: "true"
+      FLYWAY_VALIDATE_MIGRATION_NAMING: "true"
+      FLYWAY_CONNECT_RETRIES: "0"
+      FLYWAY_REPORT_ENABLED: "false"
+      REDGATE_DISABLE_TELEMETRY: "true"
+      JAVA_ARGS: -Duser.home=/tmp
+    depends_on:
+      role-bootstrap:
+        condition: service_completed_successfully
+
+  role-credentials:
+    profiles: [migrations]
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
+    restart: "no"
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    networks: [private]
+    entrypoint: [/bin/sh, /mimir/database/provision.sh]
+    command: [credentials]
+    tmpfs: [/tmp:rw,noexec,nosuid,size=16m]
+    secrets:
+      - postgres_bootstrap_password
+      - mimir_api_password
+      - mimir_worker_password
+      - mimir_auth_password
+      - mimir_maintenance_password
+    volumes:
+      - ./database:/mimir/database:ro
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+
+secrets:
+  mimir_migrator_password:
+    file: ${MIMIR_MIGRATOR_PASSWORD_FILE:-./secrets/mimir_migrator_password}
+  mimir_api_password:
+    file: ${MIMIR_API_PASSWORD_FILE:-./secrets/mimir_api_password}
+  mimir_worker_password:
+    file: ${MIMIR_WORKER_PASSWORD_FILE:-./secrets/mimir_worker_password}
+  mimir_auth_password:
+    file: ${MIMIR_AUTH_PASSWORD_FILE:-./secrets/mimir_auth_password}
+  mimir_maintenance_password:
+    file: ${MIMIR_MAINTENANCE_PASSWORD_FILE:-./secrets/mimir_maintenance_password}

@@ -3,7 +3,12 @@
 **Milestone:** M1  
 **Branch:** `feature/t03-flyway-roles` (from updated `main`)  
 **Dependencies:** T02  
-**Status:** Design brief only; not implemented or tested.
+**Status:** Implementation submitted for validation; independent agent review, human review and explicit merge authorization pending. Not merged.
+
+Acceptance IDs: DB-ROLE-01 (docs/acceptance/REQUIREMENTS.md); DB-01 and DB-02
+(backend/ACCEPTANCE_TESTS.md), limited to V001 role/schema and test-fixture RLS
+boundaries. DB-MIG-01 supporting V001/upgrade-harness coverage only; full V001–V005
+and production tenant-table acceptance remain later tasks.
 
 ## Objective / authorized scope
 Versioned SQL migration runner, schemas, application and migration roles.

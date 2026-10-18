@@ -15,6 +15,16 @@ Examples to seed the matrix (not test-pass claims): auth/session renewal → T24
 
 ## Complete acceptance ownership seed (not test execution evidence)
 
+T03 supporting role/schema coverage → `backend/tests/test_migrations.py` and
+`tests/integration/test_database.py`; deterministic policy failures and real
+PostgreSQL 18/Flyway integration. The suite covers V001, runtime privilege denial,
+forced-RLS test fixtures and synthetic incremental failure/recovery. DB-ROLE-01,
+DB-01/DB-02 and DB-MIG-01 retain their broader not-implemented status until actual
+tenant tables and V001–V005 are supplied by later tasks. The registry's T03
+`task_coverage` records this partial evidence without changing ownership or
+claiming production RLS, full migrations, application readiness or release
+acceptance. Actual command evidence and submitted SHA belong to the T03 PR.
+
 T02 DEPLOY-01 configuration/isolation/persistence coverage is implemented by
 `backend/tests/test_compose_policy.py` and `tests/integration/test_compose.py`.
 The real-engine suite uses a test-only backend port probe; application serving,
