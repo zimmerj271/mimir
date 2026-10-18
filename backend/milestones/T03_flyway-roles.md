@@ -3,7 +3,7 @@
 **Milestone:** M1  
 **Branch:** `feature/t03-flyway-roles` (from updated `main`)  
 **Dependencies:** T02  
-**Status:** Implementation submitted for validation; independent agent review, human review and explicit merge authorization pending. Not merged.
+**Status:** Implementation and applicable validation complete; independent agent review, human review and explicit merge authorization pending. Not merged.
 
 Acceptance IDs: DB-ROLE-01 (docs/acceptance/REQUIREMENTS.md); DB-01 and DB-02
 (backend/ACCEPTANCE_TESTS.md), limited to V001 role/schema and test-fixture RLS
