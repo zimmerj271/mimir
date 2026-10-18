@@ -1,5 +1,10 @@
 # Requirement-to-task-and-test traceability
 
+S00 introduces the [machine-checked registry](docs/acceptance/registry.json) and
+[interpretation notes](docs/acceptance/README.md). The seed below remains the
+approved historical ownership input; registry source-qualified IDs preserve
+distinct assertions and resolve the approved CLI-16 split without changing tests.
+
 **Target artifact**, to complete before executable API/domain implementation. The source of acceptance IDs is `backend/ACCEPTANCE_TESTS.md`; no test exists simply because a scenario is described.
 
 Every approved task brief must include `Acceptance IDs: ...` pointing to existing acceptance IDs or a newly approved ID; every ID must map to at least one task and a real test file; every contract operation and high-risk invariant must map to an acceptance ID. Unimplemented tests are tracked as **not implemented**, never implicitly passed.

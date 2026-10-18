@@ -1,5 +1,10 @@
 # Mimir — approved v1 monorepo implementation specification
 
+S00 bootstrap tooling is available via `make help` and offline `make check`.
+See [bootstrap operations](docs/governance/BOOTSTRAP.md) for governance enforcement,
+explicitly unimplemented component gates, and review requirements. No backend,
+CLI application or deployment is implemented by S00.
+
 **Design artifact only.** This package is not executable software, does not claim SQL migrations or integration tests have run, and requires the specified independent agent and human PR review at **every** task boundary.
 
 ## Product scope
