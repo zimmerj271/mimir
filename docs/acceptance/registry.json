@@ -906,5 +906,21 @@
       "last_verified_commit": null,
       "evidence": null
     }
-  ]
+  ],
+  "task_coverage": {
+    "T01": {
+      "specification": "backend/milestones/T01_python-toolchain.md",
+      "requirements": [
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "GOV-01"
+        }
+      ],
+      "tests": [
+        "backend/tests/test_toolchain.py",
+        "backend/tests/test_environment.py",
+        "tests/governance/test_checks.py"
+      ]
+    }
+  }
 }

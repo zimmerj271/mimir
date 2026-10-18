@@ -114,6 +114,26 @@ def check_registry(root, tasks, registry):
         require(set(row["owner_tasks"]) == owners[row["source"], row["id"]],
                 f"ownership differs from normative source: {row['id']} ({row['source']})")
 
+    # Supporting task coverage does not reassign normative requirement ownership.
+    for task_id, coverage in registry.get("task_coverage", {}).items():
+        require(task_id in tasks, f"unknown coverage task: {task_id}")
+        require(coverage["specification"] == tasks[task_id]["file"],
+                f"coverage specification differs from task graph: {task_id}")
+        references = [(item["source"], item["id"]) for item in coverage["requirements"]]
+        require(references and len(references) == len(set(references)),
+                f"missing or duplicate coverage requirements: {task_id}")
+        require(set(references) <= expected, f"unknown coverage requirement: {task_id}")
+        require(coverage["tests"], f"task coverage has no tests: {task_id}")
+        for test in coverage["tests"]:
+            local_file(root, test)
+
+
+def task_requirement_ids(registry, task_id):
+    references = {(item["source"], item["id"])
+                  for item in registry.get("task_coverage", {}).get(task_id, {}).get("requirements", [])}
+    return {row["id"] for row in registry["requirements"]
+            if task_id in row["owner_tasks"] or (row["source"], row["id"]) in references}
+
 
 def check_links(root, files):
     for name in files:

@@ -15,6 +15,14 @@ S00 does not rename, replace or silently merge them. Legacy `CLI-16` ownership
 references resolve to CLI-16A for E2E/integration and CLI-16B for performance,
 following the approved split in the task graph. Range ownership is expanded.
 
+`task_coverage` records supporting evidence for an assigned task without changing
+the normative requirement's owners or marking its application assertions passed.
+T01 maps its package/quality/CI foundation to GOV-01. The checker verifies its
+task/specification, source-qualified requirement references and real test paths;
+PR metadata accepts only IDs owned by or explicitly mapped to that task. Existing
+requirement ownership checks remain mandatory. See the T01 task brief and tests
+for the approved tooling acceptance criteria this supporting mapping implements.
+
 The S00 GOV-01 unit suite checks structural enforcement and failure paths. Live
 GitHub protection, independent review and human authorization additionally need
 repository/PR evidence; a unit pass cannot establish those external facts.

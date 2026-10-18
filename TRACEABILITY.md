@@ -15,6 +15,14 @@ Examples to seed the matrix (not test-pass claims): auth/session renewal → T24
 
 ## Complete acceptance ownership seed (not test execution evidence)
 
+T01 supporting coverage: GOV-01 (normative source `docs/acceptance/REQUIREMENTS.md`)
+→ `backend/tests/test_toolchain.py`, `backend/tests/test_environment.py` and
+`tests/governance/test_checks.py`; unit/toolchain integration; executable tests
+introduced by T01, with command outcomes and exact reviewed SHA recorded in its
+PR. The `task_coverage` mapping in the registry preserves S00/T41 ownership and
+does not claim application or final governance acceptance. T01's normative scope
+is `backend/milestones/T01_python-toolchain.md` at its recorded main base.
+
 | Acceptance ID | Responsible implementation tasks | Test path / status |
 |---|---|---|
 | DB-01 | T03–T07 | To create in task PR; NOT IMPLEMENTED |
