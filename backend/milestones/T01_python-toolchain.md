@@ -5,6 +5,9 @@
 **Dependencies:** None  
 **Status:** Design brief only; not implemented or tested.
 
+Acceptance IDs: GOV-01 (supporting Python quality/CI and mechanical evidence coverage;
+normative ownership remains S00/T41). See the T01 mapping in the root acceptance registry.
+
 ## Objective / authorized scope
 Establish backend package, uv lock, Ruff, typing and pytest; no domain behavior.
 

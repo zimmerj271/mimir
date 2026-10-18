@@ -66,6 +66,24 @@ class GovernanceTests(unittest.TestCase):
         self.assertEqual({row["source"] for row in rows}, {CATALOG, LEGACY})
         self.assertEqual(len(rows), 2)
 
+    def test_supporting_task_coverage_rejects_unknown_task_id_or_test(self):
+        for fault in ("task", "requirement", "test", "specification", "duplicate"):
+            with self.subTest(fault=fault):
+                registry = copy.deepcopy(self.registry)
+                coverage = registry["task_coverage"]["T01"]
+                if fault == "task":
+                    registry["task_coverage"]["UNKNOWN"] = registry["task_coverage"].pop("T01")
+                elif fault == "requirement":
+                    coverage["requirements"][0]["id"] = "UNKNOWN-01"
+                elif fault == "test":
+                    coverage["tests"] = ["missing.py"]
+                elif fault == "specification":
+                    coverage["specification"] = "README.md"
+                else:
+                    coverage["requirements"].append(coverage["requirements"][0])
+                with self.assertRaises(ValueError):
+                    check_registry(ROOT, self.tasks, registry)
+
     def test_links_valid_broken_and_escape(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -131,6 +149,10 @@ class GovernanceTests(unittest.TestCase):
         pr["head"]["ref"] = "feature/cli-12a-viewport"
         pr["body"] = pr["body"].replace("S00", "CLI-12A").replace("GOV-01", "CLI-TUI-02")
         self.assertEqual(check_pr(pr, self.tasks), "CLI-12A")
+        pr = self.pr()
+        pr["head"]["ref"] = "feature/t01-python-toolchain"
+        pr["body"] = pr["body"].replace("S00", "T01")
+        self.assertEqual(check_pr(pr, self.tasks), "T01")
 
     def test_pr_metadata_rejects_missing_evidence_wrong_task_and_base(self):
         for fault in ("body", "branch", "task", "base", "target", "stop", "acceptance"):

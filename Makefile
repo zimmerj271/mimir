@@ -27,6 +27,7 @@ lint:
 backend-check:
 	@test -f backend/pyproject.toml -a -f backend/uv.lock || { echo 'NOT IMPLEMENTED: T01 owns the backend toolchain'; exit 1; }
 	cd backend && uv sync --locked --all-groups
+	cd backend && uv lock --check
 	cd backend && uv run --locked ruff format --check .
 	cd backend && uv run --locked ruff check .
 	cd backend && uv run --locked mypy src

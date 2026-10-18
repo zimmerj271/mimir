@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import sys
 
-from check_governance import require
+from check_governance import require, task_requirement_ids
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,8 +31,9 @@ def check_pr(pr, tasks):
             "branch/task assignment mismatch")
     registry = json.loads((ROOT / "docs/acceptance/registry.json").read_text())
     acceptance = fields["Task ID / assigned scope / related acceptance IDs"]
-    require(any(task_id in row["owner_tasks"] and re.search(rf"\b{re.escape(row['id'])}\b", acceptance)
-                for row in registry["requirements"]), "no assigned acceptance ID in PR evidence")
+    require(any(re.search(rf"\b{re.escape(ident)}\b", acceptance)
+                for ident in task_requirement_ids(registry, task_id)),
+            "no assigned acceptance ID in PR evidence")
     require(pr["base"]["sha"] in fields["Branch / base `main` SHA / contract revision + checksum"],
             "record current main base SHA; refresh evidence after upstream changes")
     require("NOT MERGED / STOPPED" in fields["Actual merge commit SHA, or **NOT MERGED / STOPPED**"],
