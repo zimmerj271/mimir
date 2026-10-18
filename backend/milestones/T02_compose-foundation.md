@@ -5,6 +5,9 @@
 **Dependencies:** T01  
 **Status:** Design brief only; not implemented or tested.
 
+Acceptance IDs: DEPLOY-01 (docs/acceptance/REQUIREMENTS.md); OPS-01 supporting
+infrastructure persistence/isolation coverage only, with application checks deferred.
+
 ## Objective / authorized scope
 Define backend, PostgreSQL, Qdrant, Ollama integration endpoint, persistent volumes and isolation.
 

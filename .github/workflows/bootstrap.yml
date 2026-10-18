@@ -22,7 +22,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -36,6 +36,13 @@ jobs:
           enable-cache: false
       - run: make check
       - run: make backend-check
+      - uses: docker/setup-compose-action@54042514f505b273907334ae2b9cdbb9a0213c1a # v2
+        if: matrix.os == 'ubuntu-24.04'
+        with:
+          version: v5.5.1
+      - name: Real service isolation and persistence
+        if: matrix.os == 'ubuntu-24.04'
+        run: make deployment-check
       - name: PR assignment and evidence
         if: github.event_name == 'pull_request'
         run: python3 scripts/check_pr.py "$GITHUB_EVENT_PATH"
@@ -44,4 +51,5 @@ jobs:
           echo 'Backend package/toolchain gates executed; application behavior remains unimplemented'
           echo 'CLI builds, race and PTY tests: NOT IMPLEMENTED (CLI-01 and successors)'
           echo 'Contract semantics/producer/consumer tests: NOT IMPLEMENTED (S01 and successors)'
-          echo 'PostgreSQL/Flyway and deployment: NOT IMPLEMENTED (T02 and successors)'
+          echo 'T02 real container tests run on Linux; macOS runs deterministic policy tests only'
+          echo 'Application startup, Flyway migrations and full installation remain unimplemented'

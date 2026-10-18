@@ -1,0 +1,8 @@
+# Explicit standalone-Linux alternative. Start the private network first, bind
+# the host Ollama to that bridge's gateway (never 0.0.0.0), and validate the IP.
+services:
+  ollama:
+    profiles: [container-ollama]
+  backend:
+    extra_hosts:
+      ollama: ${MIMIR_HOST_OLLAMA_IP:?set the private Docker bridge gateway for host Ollama}

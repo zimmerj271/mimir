@@ -1,6 +1,6 @@
 PYTHON ?= python3
 .DEFAULT_GOAL := help
-.PHONY: help check governance-check test lint backend-check cli-check contract-check
+.PHONY: help check governance-check test lint backend-check cli-check contract-check compose-config deployment-check
 
 help:
 	@echo 'check              Offline S00 governance, hygiene and fault-path tests'
@@ -10,6 +10,8 @@ help:
 	@echo 'backend-check      Backend quality gates after T01'
 	@echo 'cli-check          CLI quality gates after CLI-01'
 	@echo 'contract-check     Contract validation after S01'
+	@echo 'compose-config     Validate operator Compose topology and protected secret files'
+	@echo 'deployment-check   Real-engine T02 tests in a unique disposable test stack'
 
 check: governance-check lint test
 
@@ -28,10 +30,16 @@ backend-check:
 	@test -f backend/pyproject.toml -a -f backend/uv.lock || { echo 'NOT IMPLEMENTED: T01 owns the backend toolchain'; exit 1; }
 	cd backend && uv sync --locked --all-groups
 	cd backend && uv lock --check
-	cd backend && uv run --locked ruff format --check .
-	cd backend && uv run --locked ruff check .
-	cd backend && uv run --locked mypy src
+	cd backend && uv run --locked ruff format --config pyproject.toml --check . ../deployment/validate_compose.py ../tests/integration/test_compose.py
+	cd backend && uv run --locked ruff check --config pyproject.toml . ../deployment/validate_compose.py ../tests/integration/test_compose.py
+	cd backend && uv run --locked mypy src ../deployment/validate_compose.py
 	cd backend && uv run --locked pytest -q
+
+compose-config:
+	cd backend && uv run --locked python ../deployment/validate_compose.py
+
+deployment-check:
+	cd backend && uv run --locked pytest -c pyproject.toml ../tests/integration/test_compose.py -q
 
 cli-check:
 	@test -f cli/go.mod || { echo 'NOT IMPLEMENTED: CLI-01 owns the Go toolchain'; exit 1; }

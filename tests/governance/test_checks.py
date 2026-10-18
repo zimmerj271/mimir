@@ -57,7 +57,8 @@ class GovernanceTests(unittest.TestCase):
                 elif fault == "test":
                     registry["requirements"][0]["tests"] = ["absent.py"]
                 else:
-                    registry["requirements"][0]["status"] = "implemented"
+                    row = next(row for row in registry["requirements"] if row["status"] == "not_implemented")
+                    row["status"] = "implemented"
                 with self.assertRaises(ValueError):
                     check_registry(ROOT, self.tasks, registry)
 

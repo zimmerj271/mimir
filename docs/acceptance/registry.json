@@ -8,11 +8,14 @@
         "T02",
         "DEPLOY-01"
       ],
-      "tests": [],
-      "kind": "not_implemented",
-      "status": "not_implemented",
+      "tests": [
+        "backend/tests/test_compose_policy.py",
+        "tests/integration/test_compose.py"
+      ],
+      "kind": "integration",
+      "status": "implemented",
       "last_verified_commit": null,
-      "evidence": null
+      "evidence": "T02 PR: policy, real service isolation/persistence and test-only port probe; real API/native macOS/full installation acceptance remains unverified."
     },
     {
       "id": "DEPLOY-02",
