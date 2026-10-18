@@ -62,17 +62,12 @@ def test_fresh_locked_environment_and_repeat_sync(project: Path) -> None:
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize("fault", ["stale_lock", "missing_lock", "wrong_uv"])
+@pytest.mark.parametrize("fault", ["missing_lock", "wrong_uv"])
 def test_locked_sync_rejects_invalid_toolchain(project: Path, fault: str) -> None:
     manifest = project / "pyproject.toml"
     lock = project / "uv.lock"
     original = lock.read_bytes()
-    if fault == "stale_lock":
-        # Local metadata drift requires no registry lookup on a cold offline cache.
-        manifest.write_text(
-            manifest.read_text().replace('version = "0.1.0"', 'version = "0.1.1"')
-        )
-    elif fault == "missing_lock":
+    if fault == "missing_lock":
         lock.unlink()
     else:
         manifest.write_text(
@@ -90,6 +85,33 @@ def test_locked_sync_rejects_invalid_toolchain(project: Path, fault: str) -> Non
         assert not lock.exists()
     else:
         assert lock.read_bytes() == original
+
+
+def test_stale_lock_rejected_while_unlocked_control_succeeds(tmp_path: Path) -> None:
+    # A stale graph is re-resolved by uv. Use no registry dependencies to isolate
+    # --locked semantics from the availability of cached PyPI index metadata.
+    project = tmp_path / "lock-fixture"
+    project.mkdir()
+    manifest = project / "pyproject.toml"
+    manifest.write_text(
+        '[project]\nname = "mimir-lock-fixture"\nversion = "0.1.0"\n'
+        'requires-python = ">=3.14,<3.15"\n'
+        '[tool.uv]\nrequired-version = "==0.12.10"\n'
+    )
+    result = run_uv(project, "lock", "--python", sys.executable)
+    assert result.returncode == 0, result.stderr
+    lock = project / "uv.lock"
+    original = lock.read_bytes()
+    manifest.write_text(
+        manifest.read_text().replace('version = "0.1.0"', 'version = "0.1.1"')
+    )
+    result = run_uv(project, "sync", "--locked", "--python", sys.executable)
+    assert result.returncode != 0
+    assert "lockfile" in result.stderr.lower(), result.stderr
+    assert lock.read_bytes() == original
+    control = run_uv(project, "sync", "--python", sys.executable)
+    assert control.returncode == 0, control.stderr
+    assert lock.read_bytes() != original
 
 
 def test_wheel_and_sdist_install_without_source_checkout(project: Path) -> None:

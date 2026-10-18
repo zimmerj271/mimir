@@ -58,7 +58,9 @@ Acceptance coverage: GOV-01 supporting quality/evidence controls, recorded in
 [TRACEABILITY.md](../TRACEABILITY.md) and the
 [acceptance registry](../docs/acceptance/registry.json). Tests verify installation
 outside the checkout, async cancellation/cleanup, fresh/repeated locked sync,
-missing/stale-lock and wrong-uv rejection, wheel/sdist contents, rebuilding from
+missing-lock and wrong-uv rejection on the full backend project, stale-lock
+rejection on a dependency-free fixture with a successful unlocked control,
+wheel/sdist contents, rebuilding from
 the sdist through PEP 517 with the locked dev build backend (no build isolation
 or network), and importing the resulting wheel without the source checkout. They
 test tooling guarantees; they establish no application auth/concurrency behavior.
