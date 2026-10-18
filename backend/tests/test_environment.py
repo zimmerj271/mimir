@@ -68,10 +68,9 @@ def test_locked_sync_rejects_invalid_toolchain(project: Path, fault: str) -> Non
     lock = project / "uv.lock"
     original = lock.read_bytes()
     if fault == "stale_lock":
+        # Local metadata drift requires no registry lookup on a cold offline cache.
         manifest.write_text(
-            manifest.read_text().replace(
-                "dependencies = []", 'dependencies = ["typing-extensions==4.16.0"]'
-            )
+            manifest.read_text().replace('version = "0.1.0"', 'version = "0.1.1"')
         )
     elif fault == "missing_lock":
         lock.unlink()
@@ -85,11 +84,8 @@ def test_locked_sync_rejects_invalid_toolchain(project: Path, fault: str) -> Non
         project, "sync", "--locked", "--all-groups", "--python", sys.executable
     )
     assert result.returncode != 0
-    assert (
-        "lockfile" in result.stderr.lower()
-        if fault != "wrong_uv"
-        else "required" in result.stderr.lower()
-    )
+    expected = "required" if fault == "wrong_uv" else "lockfile"
+    assert expected in result.stderr.lower(), result.stderr
     if fault == "missing_lock":
         assert not lock.exists()
     else:
