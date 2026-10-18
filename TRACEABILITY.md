@@ -15,6 +15,14 @@ Examples to seed the matrix (not test-pass claims): auth/session renewal → T24
 
 ## Complete acceptance ownership seed (not test execution evidence)
 
+T02 DEPLOY-01 configuration/isolation/persistence coverage is implemented by
+`backend/tests/test_compose_policy.py` and `tests/integration/test_compose.py`.
+The real-engine suite uses a test-only backend port probe; application serving,
+schema readiness, native macOS runtime and full installation acceptance remain
+unverified. OPS-01 retains its not-implemented status for application/recovery
+behavior owned by later tasks. Exact commits, commands and real results are in
+the T02 PR; neither static policy tests nor a probe establish API correctness.
+
 T01 supporting coverage: GOV-01 (normative source `docs/acceptance/REQUIREMENTS.md`)
 → `backend/tests/test_toolchain.py`, `backend/tests/test_environment.py` and
 `tests/governance/test_checks.py`; unit/toolchain integration; executable tests

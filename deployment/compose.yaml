@@ -1,0 +1,117 @@
+name: mimir
+
+services:
+  # Wiring only: no API command or schema readiness implementation exists yet.
+  # Explicitly disabled; later application tasks must supply the real entry point.
+  backend:
+    profiles: [backend]
+    image: mimir-backend:t02
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    entrypoint: []
+    command: []
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - target: 8000
+        published: "8000"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    # Docker does not publish ports from an internal-only network. Data services
+    # remain internal; only the backend joins the host-facing API bridge.
+    networks: [private, api]
+    sysctls:
+      net.ipv4.ip_forward: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+  postgres:
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
+    restart: unless-stopped
+    entrypoint: [/bin/sh, /mimir/postgres-entrypoint.sh]
+    command: [postgres, -c, password_encryption=scram-sha-256, -c, timezone=UTC]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    secrets: [postgres_bootstrap_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./postgres-entrypoint.sh:/mimir/postgres-entrypoint.sh:ro
+    networks: [private]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres, -d, postgres]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
+    restart: unless-stopped
+    cap_drop: [ALL]
+    # Bootstrap root reads a caller-owned 0600 secret without relaxing host modes.
+    cap_add: [DAC_OVERRIDE]
+    entrypoint: [/bin/sh, /mimir/qdrant-entrypoint.sh]
+    command: []
+    security_opt: [no-new-privileges:true]
+    networks: [private]
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./qdrant-entrypoint.sh:/mimir/qdrant-entrypoint.sh:ro
+    secrets: [qdrant_api_key]
+    environment:
+      QDRANT__TELEMETRY_DISABLED: "true"
+
+  ollama:
+    image: ollama/ollama:0.40.6@sha256:265409e1d931028a8f7d5a32bcbafddd7bffbc6cc629d77efe9560adf692a5e7
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [private]
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_NO_CLOUD: "true"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: [CMD, ollama, list]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+networks:
+  private:
+    internal: true
+  api:
+    driver: bridge
+    internal: false
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: 127.0.0.1
+
+# External volumes are not removed by Compose down, including down --volumes.
+# Provision them explicitly before first start; there is no destructive lifecycle.
+volumes:
+  postgres_data:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME:-mimir}_postgres
+  qdrant_data:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME:-mimir}_qdrant
+  ollama_data:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME:-mimir}_ollama
+
+secrets:
+  postgres_bootstrap_password:
+    file: ${MIMIR_POSTGRES_PASSWORD_FILE:-./secrets/postgres_bootstrap_password}
+  qdrant_api_key:
+    file: ${MIMIR_QDRANT_API_KEY_FILE:-./secrets/qdrant_api_key}

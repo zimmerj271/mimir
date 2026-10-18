@@ -1,0 +1,17 @@
+**
+!backend/
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/README.md
+!backend/.python-version
+!backend/src/
+!backend/src/**
+!deployment/
+!deployment/Dockerfile
+**/__pycache__/**
+**/*.py[cod]
+**/secrets/**
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
