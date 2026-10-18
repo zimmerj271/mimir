@@ -1,0 +1,5 @@
+# Canonical shared API contract (monorepo)
+
+`/contracts` is the **single** backend-owned contract directory used by both independent Go/Python builds. Files are specification-stage machine-readable drafts requiring S01 validation/freeze before endpoint or transport tasks. They are **not** FastAPI-generated or proven provider-conformant. `openapi.yaml`, `sse.schema.json`, `errors.json`, `fixtures/`, and `manifest.json` must validate together under S01; public changes require explicit human approval and appropriate semver compatibility checks. Never generate independent CLI copies or move the contract to a separate repository.
+
+The authoritative approved semantics are `../docs/decisions/FINAL_V1.md`, `../STATE_MACHINES.md`, backend API documents and the reconciled schema. On conflict STOP, revise draft in an approved contract PR, do not invent a field. `/api/v1/auth/refresh` is forbidden: sessions renew implicitly on authenticated requests. Loopback only, no remote base-url profiles. See `../docs/verification/REPORT.md` for remaining executable-validation status.

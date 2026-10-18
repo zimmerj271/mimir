@@ -1,0 +1,7 @@
+{
+  "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+  "event_version": 1,
+  "event": "message.delta",
+  "sequence": 1,
+  "text": "Hello"
+}

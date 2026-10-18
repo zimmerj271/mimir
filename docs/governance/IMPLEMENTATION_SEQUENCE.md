@@ -1,0 +1,5 @@
+# Task execution and prerequisite policy
+
+Canonical graph: `TASK_GRAPH.json`; all listed prerequisites must be merged before a task begins. Suggested earliest sequence: S00 → S01 (freeze shared contract) alongside T01/CLI-01 after S00; T02 → T03 → T04 → T05 → T06 → T07 sequential Flyway migrations; then scoped backend auth/archive/inference and Go consumer work as prerequisites permit; Mem0 feasibility T29 precedes actual adapter T31; verified conformance tasks T20–T28; integrated CLI-16A/B/C and DEPLOY-01; then cumulative human release gates. No unapproved parallel branches. S01 is *not* permission to modify runtime code. Backend T41 release gate requires complete application deployment evidence from DEPLOY-01 in its final acceptance, without circular graph prerequisite.
+
+Agent review of actual diff and tests must be a separate session; Critical/High defects block, Medium require correction or affirmative acceptance. Shared contracts, SQL, CI, AGENTS and design are protected. All changes to public behavior request human specification approval first. Historical CLI-12/16 briefs are non-normative in appendices.

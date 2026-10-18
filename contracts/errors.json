@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "shape": "#/components/schemas/Error",
+  "codes": {
+    "unauthenticated": 401,
+    "forbidden": 403,
+    "not_found": 404,
+    "project_not_empty": 409,
+    "conversation_version_conflict": 409,
+    "idempotency_key_conflict": 409,
+    "active_run_conflict": 409,
+    "invalid_run_transition": 409,
+    "operation_expired": 410,
+    "operation_unknown": 404,
+    "context_budget_exceeded": 422,
+    "invalid_request": 422,
+    "payload_too_large": 413,
+    "rate_limited": 429,
+    "dependency_unavailable": 503,
+    "backend_timeout": 504
+  }
+}

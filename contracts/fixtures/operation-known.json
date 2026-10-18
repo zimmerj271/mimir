@@ -1,0 +1,8 @@
+{
+  "operation_type": "message_submit",
+  "idempotency_key": "example-op-key-123",
+  "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+  "conversation_id": "0199a1b2-c3d4-7e8f-9123-123456789abd",
+  "status": "accepted",
+  "accepted_at": "2026-10-17T18:00:00Z"
+}

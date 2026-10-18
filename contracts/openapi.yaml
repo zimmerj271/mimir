@@ -1,0 +1,1839 @@
+openapi: 3.1.0
+info:
+  title: Mimir backend API
+  version: 1.0.0
+  description: Normative Mimir v1 design contract for S01 executable contract freeze. No implementation or producer
+    conformance implied by this artifact.
+servers:
+- url: http://127.0.0.1:8000
+paths:
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: &id001
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+  /api/v1/auth/session:
+    get:
+      operationId: getSession
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      responses:
+        '204':
+          description: Success
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+  /api/v1/users/me:
+    get:
+      operationId: getMe
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+    patch:
+      operationId: patchMe
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPatch'
+  /api/v1/projects:
+    get:
+      operationId: listProjects
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListProjects'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 1048576
+          description: Canonical UTF-8 text, at most 1,048,576 encoded bytes, enforced server-side (maxLength is
+            only an additional character bound). No silent truncation.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+    post:
+      operationId: createProject
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+      parameters:
+      - &id003
+        name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: ^[A-Za-z0-9._-]+$
+  /api/v1/projects/{id}:
+    get:
+      operationId: getProject
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - &id002
+        name: id
+        in: path
+        required: true
+        schema: &id004
+          type: string
+          format: uuid
+    patch:
+      operationId: patchProject
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectPatch'
+      parameters:
+      - *id002
+    delete:
+      operationId: deleteProject
+      responses:
+        '204':
+          description: Success
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - *id002
+  /api/v1/conversations:
+    get:
+      operationId: listConversations
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListConversations'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 1048576
+          description: Canonical UTF-8 text, at most 1,048,576 encoded bytes, enforced server-side (maxLength is
+            only an additional character bound). No silent truncation.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+    post:
+      operationId: createConversation
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationCreate'
+      parameters:
+      - *id003
+  /api/v1/conversations/{id}:
+    get:
+      operationId: getConversation
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - *id002
+    patch:
+      operationId: patchConversation
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationPatch'
+      parameters:
+      - *id002
+    delete:
+      operationId: deleteConversation
+      responses:
+        '202':
+          description: 'Deletion accepted: subtree is durably fenced for asynchronous cleanup'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionAccepted'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - *id002
+      description: 202 fences the full branch subtree asynchronously; not a synchronous 204 purge.
+  /api/v1/conversations/{id}/messages:
+    get:
+      operationId: listMessages
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMessages'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 1048576
+          description: Canonical UTF-8 text, at most 1,048,576 encoded bytes, enforced server-side (maxLength is
+            only an additional character bound). No silent truncation.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+    post:
+      operationId: submitMessage
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedRun'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '413':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageSubmit'
+      parameters:
+      - *id002
+      - *id003
+  /api/v1/conversations/{id}/branches:
+    post:
+      operationId: createBranch
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BranchCreate'
+      parameters:
+      - *id002
+      - *id003
+  /api/v1/runs/standalone:
+    post:
+      operationId: submitStandalone
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedRun'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '413':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StandaloneSubmit'
+      parameters:
+      - *id003
+  /api/v1/runs/{run_id}:
+    get:
+      operationId: getRun
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - &id005
+        name: run_id
+        in: path
+        required: true
+        schema: *id004
+  /api/v1/runs/{run_id}/events:
+    get:
+      operationId: subscribeRun
+      responses:
+        '200':
+          description: Success
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              description: Frame types defined by sse.schema.json; SSE comments heartbeat.
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '410':
+          description: Typed error; expired operation identity
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - *id005
+      description: Initial run.snapshot replaces provisional text, followed by ordered message.delta with contiguous
+        text sequence. No Last-Event-ID replay. Heartbeat comments every 15 seconds; stream disconnect does not
+        cancel run.
+  /api/v1/runs/{run_id}/cancel:
+    post:
+      operationId: cancelRun
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '409':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '422':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '429':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - *id005
+  /api/v1/operations/{operation_type}/{idempotency_key}:
+    get:
+      operationId: lookupOperation
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '410':
+          description: Typed error; expired operation identity
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: operation_type
+        in: path
+        required: true
+        schema:
+          enum:
+          - conversation_create
+          - message_submit
+          - branch_create
+          - standalone_submit
+      - name: idempotency_key
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: ^[A-Za-z0-9._-]+$
+      description: 200 is authoritative known operation; 410 indicates expired identity; 404 means unknown within
+        retained evidence and is NOT proof that submission was never accepted. Never auto-resubmit a prompt on 404.
+  /api/v1/models:
+    get:
+      operationId: listModels
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListModels'
+        '400':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+      security:
+      - bearerAuth: []
+  /api/v1/health/live:
+    get:
+      operationId: healthLive
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /api/v1/health/ready:
+    get:
+      operationId: healthReady
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+  /api/v1/health/dependencies:
+    get:
+      operationId: healthDependencies
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+      security:
+      - bearerAuth: []
+  /api/v1/meta:
+    get:
+      operationId: getApiMetadata
+      summary: Unauthenticated client contract compatibility discovery
+      responses:
+        '200':
+          description: Backend contract metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - contract_version
+                - compatible_range
+                properties:
+                  contract_version:
+                    type: string
+                  compatible_range:
+                    type: string
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Error:
+      type: object
+      required:
+      - error
+      - request_id
+      additionalProperties: false
+      properties:
+        request_id:
+          type: string
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - details
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+          additionalProperties: false
+    User:
+      type: object
+      additionalProperties: false
+      properties:
+        user_id: *id004
+        username: &id006
+          type: string
+          maxLength: 1048576
+          description: Canonical UTF-8 text, at most 1,048,576 encoded bytes, enforced server-side (maxLength is
+            only an additional character bound). No silent truncation.
+        display_name:
+          oneOf:
+          - *id006
+          - type: 'null'
+      required:
+      - user_id
+      - username
+      - display_name
+    Session:
+      type: object
+      additionalProperties: false
+      properties:
+        user_id: *id004
+        expires_at: &id007
+          type: string
+          format: date-time
+        absolute_expires_at: *id007
+        client_type:
+          enum:
+          - web
+          - cli
+      required:
+      - user_id
+      - expires_at
+      - absolute_expires_at
+      - client_type
+    Project:
+      type: object
+      additionalProperties: false
+      properties:
+        project_id: *id004
+        name: *id006
+        description:
+          oneOf:
+          - *id006
+          - type: 'null'
+        status:
+          enum:
+          - active
+          - archived
+        created_at: *id007
+      required:
+      - project_id
+      - name
+      - description
+      - status
+      - created_at
+    Conversation:
+      type: object
+      additionalProperties: false
+      properties:
+        conversation_id: *id004
+        project_id:
+          oneOf:
+          - *id004
+          - type: 'null'
+        title: *id006
+        conversation_version:
+          type: integer
+          minimum: 1
+        status:
+          enum:
+          - active
+          - archived
+        updated_at: *id007
+      required:
+      - conversation_id
+      - project_id
+      - title
+      - conversation_version
+      - status
+      - updated_at
+    MessageContent:
+      type: object
+      additionalProperties: false
+      properties:
+        format:
+          const: text/v1
+        text: *id006
+      required:
+      - format
+      - text
+    Message:
+      type: object
+      additionalProperties: false
+      properties:
+        message_id: *id004
+        revision_id: *id004
+        conversation_id: *id004
+        role:
+          enum:
+          - user
+          - assistant
+          - system
+          - tool
+        status:
+          enum:
+          - pending
+          - completed
+          - failed
+          - interrupted
+        ordinal: &id008
+          type: integer
+        content:
+          $ref: '#/components/schemas/MessageContent'
+        created_at: *id007
+      required:
+      - message_id
+      - revision_id
+      - conversation_id
+      - role
+      - status
+      - ordinal
+      - content
+      - created_at
+    Run:
+      type: object
+      additionalProperties: false
+      properties:
+        run_id: *id004
+        kind:
+          enum:
+          - conversation
+          - standalone
+        status:
+          enum:
+          - pending
+          - running
+          - completed
+          - failed
+          - cancelled
+          - interrupted
+        checkpoint_text: *id006
+        checkpoint_sequence:
+          type: integer
+          minimum: 0
+        final_text:
+          oneOf:
+          - *id006
+          - type: 'null'
+        error_code:
+          oneOf:
+          - *id006
+          - type: 'null'
+        created_at: *id007
+        completed_at:
+          oneOf:
+          - *id007
+          - type: 'null'
+        cancellation_requested:
+          type: boolean
+          description: True after accepted cancellation request until a terminal state is committed.
+      required:
+      - run_id
+      - kind
+      - status
+      - checkpoint_text
+      - checkpoint_sequence
+      - final_text
+      - error_code
+      - created_at
+      - completed_at
+      - cancellation_requested
+      description: Authoritative run resource. On completed status final_text is non-null and canonical (subject
+        to seven-day standalone retention). On noncompleted status final_text is null. Cancellation_requested does
+        not by itself imply cancelled.
+    AcceptedRun:
+      type: object
+      additionalProperties: false
+      properties:
+        run_id: *id004
+        message_id:
+          oneOf:
+          - *id004
+          - type: 'null'
+        conversation_version:
+          oneOf:
+          - *id008
+          - type: 'null'
+      required:
+      - run_id
+      - message_id
+      - conversation_version
+    Operation:
+      type: object
+      additionalProperties: false
+      properties:
+        operation_type: *id006
+        idempotency_key: *id006
+        run_id:
+          oneOf:
+          - *id004
+          - type: 'null'
+        conversation_id:
+          oneOf:
+          - *id004
+          - type: 'null'
+        status:
+          enum:
+          - accepted
+          - completed
+          - failed
+          - cancelled
+          - interrupted
+        accepted_at: *id007
+      required:
+      - operation_type
+      - idempotency_key
+      - run_id
+      - conversation_id
+      - status
+      - accepted_at
+    Model:
+      type: object
+      additionalProperties: false
+      properties:
+        model_config_id: *id006
+        display_name: *id006
+        enabled:
+          type: boolean
+        supports_streaming:
+          type: boolean
+      required:
+      - model_config_id
+      - display_name
+      - enabled
+      - supports_streaming
+    ListProjects:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        next_cursor:
+          oneOf:
+          - *id006
+          - type: 'null'
+      required:
+      - items
+      - next_cursor
+    ListConversations:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Conversation'
+        next_cursor:
+          oneOf:
+          - *id006
+          - type: 'null'
+      required:
+      - items
+      - next_cursor
+    ListMessages:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        next_cursor:
+          oneOf:
+          - *id006
+          - type: 'null'
+      required:
+      - items
+      - next_cursor
+    ListModels:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Model'
+      required:
+      - items
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+        client_type:
+          enum:
+          - cli
+          - web
+      required:
+      - username
+      - password
+      - client_type
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        access_token: *id006
+        session:
+          $ref: '#/components/schemas/Session'
+      required:
+      - access_token
+      - session
+    ProjectCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          oneOf:
+          - *id006
+          - type: 'null'
+      required:
+      - name
+    ProjectPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          oneOf:
+          - *id006
+          - type: 'null'
+        status:
+          enum:
+          - active
+          - archived
+      required: []
+    ConversationCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        project_id:
+          oneOf:
+          - *id004
+          - type: 'null'
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+      required: []
+    ConversationPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        project_id:
+          oneOf:
+          - *id004
+          - type: 'null'
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        status:
+          enum:
+          - active
+          - archived
+        expected_conversation_version:
+          type: integer
+          minimum: 1
+      required:
+      - expected_conversation_version
+    MessageSubmit:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          $ref: '#/components/schemas/MessageContent'
+        expected_conversation_version:
+          type: integer
+          minimum: 1
+        model_config_id: *id006
+      required:
+      - content
+      - expected_conversation_version
+    StandaloneSubmit:
+      type: object
+      additionalProperties: false
+      properties:
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 1048576
+          description: UTF-8 max 1,048,576 bytes; server must enforce encoded length.
+        model_config_id: *id006
+      required:
+      - prompt
+    BranchCreate:
+      oneOf:
+      - $ref: '#/components/schemas/BranchAfterRevision'
+      - $ref: '#/components/schemas/BranchReplaceMessage'
+      discriminator:
+        propertyName: mode
+        mapping:
+          after_revision: '#/components/schemas/BranchAfterRevision'
+          replace_message: '#/components/schemas/BranchReplaceMessage'
+    Health:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          enum:
+          - ok
+          - degraded
+      required:
+      - status
+    UserPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        display_name:
+          oneOf:
+          - *id006
+          - type: 'null'
+      required: []
+    BranchAfterRevision:
+      type: object
+      additionalProperties: false
+      required:
+      - mode
+      - source_revision_id
+      - expected_conversation_version
+      properties:
+        mode:
+          const: after_revision
+        source_revision_id:
+          type: string
+          format: uuid
+        expected_conversation_version:
+          type: integer
+          minimum: 1
+        title:
+          type:
+          - string
+          - 'null'
+    BranchReplaceMessage:
+      type: object
+      additionalProperties: false
+      required:
+      - mode
+      - source_revision_id
+      - expected_conversation_version
+      properties:
+        mode:
+          const: replace_message
+        source_revision_id:
+          type: string
+          format: uuid
+        expected_conversation_version:
+          type: integer
+          minimum: 1
+        title:
+          type:
+          - string
+          - 'null'
+    DeletionAccepted:
+      type: object
+      additionalProperties: false
+      required:
+      - deletion_id
+      - status
+      properties:
+        deletion_id:
+          type: string
+          format: uuid
+        status:
+          const: accepted

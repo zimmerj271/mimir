@@ -1,0 +1,18 @@
+{
+  "openapi_version": "3.1.0",
+  "checks": {
+    "task_count": 63,
+    "task_graph_acyclic": true,
+    "schema_count": 29,
+    "path_count": 20,
+    "fixtures_validated": 6,
+    "pagination_approved": true,
+    "delete_async_202": true,
+    "operation_410": true,
+    "sse_text_only_sequence": true,
+    "refresh_endpoint_absent": true,
+    "manifest_files": 15,
+    "schema_validation": true
+  },
+  "errors": []
+}

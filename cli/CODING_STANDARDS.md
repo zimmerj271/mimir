@@ -1,0 +1,14 @@
+# Go coding conventions — Mimir CLI
+
+## Layout and construction
+- CLI-01 owns real module path and baseline. Prefer `cmd/mimir` for `main`, `internal/` for private packages, thin Cobra commands and separately testable app/domain/transport/local-state/TUI layers. Package names concise, lowercase, no stutter; keep dependency graph directed from presentation toward domain abstractions. Avoid premature generic frameworks.
+- Go favors small functions, cohesive structs and composition, **not** Python-style classes. Put interfaces where a consumer needs substitutions; accept interfaces, return concrete types when practical. Constructors validate dependencies and return errors when needed. Avoid package-level mutable singletons or init-time network access.
+- Always `gofmt`; idiomatic names (`ID`, `URL`, `HTTP` initialisms; mixedCaps export names), clear GoDoc for exported APIs, and explicit receiver ownership. No shadowed errors, no unchecked I/O, no broad recover that hides faults. Wrap causal errors, classify network/auth/protocol errors without string matching; preserve original cause.
+- Every outbound request and SSE reader accepts context; deadlines/idle timeout distinct from generation runtime; never cancel a server run just because transport broke. Bound reconnection and buffered events; close bodies/connections; no goroutine leaks. Use mutexes/channels deliberately, document ownership and shutdown ordering.
+- Never let terminal renderer own backend truth. Canonical messages/cursors and run status come from server. Keep interactive display model separate from transport, streaming reconciliation and persistence. Snapshot and rollback behavior must be specified before implementation.
+
+## Dependencies, builds and tests
+- Native `go.mod` / `go.sum` govern versions. Prefer standard library and task-approved libraries; avoid dependency churn, unpinned tools, custom homegrown module managers, CGO unless explicitly justified.
+- Unit tests table-driven where useful; use `testing`, `httptest`, fake event streams and injected clocks; race detector for stateful code; PTY test terminal lifecycle including signals and restoration. Include tests for auth errors, interrupted stream, invalid UTF-8, resize, Ctrl-C, no extra stdout and concurrent local-state writes.
+- Quality commands: `go test ./...`, `go test -race ./...`, `go vet ./...`, `go build ./cmd/mimir`; zero output from `gofmt -l` for tracked Go files; `go mod tidy` must not change committed manifests. Cross-compile `GOOS=linux GOARCH=amd64/arm64` and `GOOS=darwin GOARCH=amd64/arm64` at release gate if dependency support permits; execute tests on real supported OS runners, not just cross-compilation.
+- Pin optional `golangci-lint` and `govulncheck` version/tool configuration during CLI-01 and require in CI once provisioned. Document failures honestly. Never disable linters broadly or weaken a test to make CI pass.

@@ -1,0 +1,13 @@
+# HTTP semantic constraints (normative supplement to OpenAPI)
+
+This supplement is contract-owned and must be checked with `openapi.yaml`, `errors.json`, fixtures and the authoritative approved decision ledger. No implementation may silently supply an unspecified public behavior.
+
+- All JSON uses snake_case, UUIDv7 IDs for new persistent entities and UTC RFC3339 datetimes. Unknown request fields are rejected and nullable fields follow their schema. Message text has a **UTF-8 encoded** maximum of 1,048,576 bytes; JSON Schema `maxLength` alone cannot enforce this byte limit. The limit applies equally to user and final assistant content; overflow fails rather than silently truncates.
+- Project and conversation cursor pagination defaults to 50, maximum 200; message pagination defaults to 100, maximum 500. Cursor values are opaque, user-scoped and stable under their documented ordering policy. No full-history export may stop after the first page.
+- Deleting a conversation (`DELETE /api/v1/conversations/{id}`) returns HTTP 202 with a deletion identity, places the full subtree behind a durable deletion fence and performs asynchronous cleanup. It is not HTTP 204 synchronous deletion.
+- Branch creation takes explicit `mode: after_revision | replace_message` with `source_revision_id` and `expected_conversation_version`; exact inherited revision IDs are frozen transactionally. Branch creation does not silently launch inference.
+- `GET /api/v1/operations/{operation_type}/{idempotency_key}` returns 200 for retained accepted identity, 410 after expiration and 404 for unknown lookup. 404 is **not evidence** that the operation was never accepted. An expired standalone result may be absent while its operation identity is retained. No automatic replay after ambiguous acknowledgment.
+- `POST /api/v1/runs/{run_id}/cancel` returns the authoritative Run with `cancellation_requested` until the terminal transition wins; a request does not imply a cancelled outcome.
+- `GET /api/v1/meta` provides unauthenticated supported contract-version discovery but no sensitive diagnostics. The authentication model is a single bearer session with implicit sliding idle expiry and 90-day absolute expiry; there is no refresh endpoint.
+- Standalone runs retain final result seven days, create no conversation revision and trigger no memory ingestion. Completed conversational runs atomically commit their canonical assistant revision, terminal run and eligible ingestion job.
+- Provider errors and memory-degraded diagnostics must never leak prompt, secret or memory contents. Security/isolation ambiguity must fail closed; mere memory unavailability may permit explicitly labeled degraded inference.

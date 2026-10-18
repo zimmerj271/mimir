@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "project_not_empty",
+    "message": "Project has conversations",
+    "details": {}
+  },
+  "request_id": "req-1"
+}

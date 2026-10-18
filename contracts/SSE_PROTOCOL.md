@@ -1,0 +1,7 @@
+# SSE v1 wire semantics (normative)
+
+`GET /api/v1/runs/{run_id}/events` uses `text/event-stream`. Each event is an SSE frame with an `event: <type>` field and a single-line `data:` JSON object conforming to `sse.schema.json`; the JSON `event` discriminator must equal the frame event type. Heartbeats are SSE comments every 15 seconds, not data events. No `id`/`Last-Event-ID` durable replay contract exists.
+
+An attachment atomically subscribes and supplies an initial `run.snapshot` consistent with all subsequent live deltas. The snapshot `text` replaces the entire provisional display, and `snapshot_sequence` is the highest text delta represented. Only `message.delta` increments the text sequence, strictly contiguously; `run.started`, `run.usage` and terminal control events have **no text sequence**. On a missing or duplicate sequence, or an impossible status transition, discard incremental assumptions and reattach for an authoritative new snapshot. A reconnect to an already-running run does not synthesize `run.started`.
+
+Terminal event emission occurs after PostgreSQL terminal commit; consumers still verify canonical result via `GET /runs/{run_id}` for one-shot stdout. Subscriber overflow terminates only the stream, never the run. Terminal frames do not promise token replay. The backend preserves a bounded subscriber buffer of 256 and emits heartbeats at least every 15 seconds while attached.

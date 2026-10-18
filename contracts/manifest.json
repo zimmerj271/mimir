@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "status": "draft_for_S01_human_approval",
+  "contract_version": "1.0.0",
+  "hash_algorithm": "sha256",
+  "files": {
+    "HTTP_SEMANTICS.md": "6967a34487961f30629fb0a67fd4390ae3ad160507c64f8e59892445cff85db8",
+    "README.md": "1e6cf8aff4dc231db13517f0ead2c4e8584bda06c8ffb88c8b038b36e3e383fa",
+    "SSE_PROTOCOL.md": "ab0e6597014210f0fb88d5d345bba87ceb3388a680e6d0d5f9401dbd6e68388a",
+    "errors.json": "bb6102003695fdc9f37d0b06fa1b7b81ef831755dac724613d1df042b2e1731b",
+    "fixtures/branch-after.json": "713431a305cabb6f68f6ac4c296be25e775c22b8e8412d186d81d962d5911151",
+    "fixtures/branch-replace.json": "1162a96bdf760c0500e4de0c0c1c57ddd888bb8468f052e7a124e63146c8c18c",
+    "fixtures/deletion-accepted.json": "657bc5ef5e55f31daff8d8fcaf69e67fadd2ae90583de3e5472fe8d43804c0dd",
+    "fixtures/error.json": "af32b4c72fe955a13194b6532bcae404591f4d97ec02dd42809399f4a9a21ee8",
+    "fixtures/message-content.json": "5204ccf5055eb7c780b66958c6f78d2e0af4de18754f7fbe16514ff276830061",
+    "fixtures/operation-known.json": "f52001b7685b0c7434657325eb8028ad630afa8cf64eaffd7f58a45ee1ffd6ef",
+    "fixtures/sse-completed.json": "32f7b224cb5511f7a137eec239b8e22a1968ce7516bdce1d7af0ba14b0316983",
+    "fixtures/sse-delta.json": "0755a17d212debe4661167d42d7de407c3a5ff0860fbb445c5572ee46756f2fe",
+    "fixtures/sse-snapshot.json": "821cd90c0f9e34a0757f8dd923a6bbb5d11b50b286d4f4d8258cb3ba9acaf63c",
+    "openapi.yaml": "ac4bfd4cc2456ec69943226bbfa105d0f47b20b18f26fc7d9be4a78e9c1f3ad6",
+    "sse.schema.json": "19cf6ff497899c345c53337b3ee953926d2f955958b3c6989b4aafedab46b825"
+  }
+}

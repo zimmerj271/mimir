@@ -1,0 +1,798 @@
+{
+  "schema_version": 1,
+  "policy": "Serial tasks by default. All prerequisites merged. Agent review and explicit human approval at every PR boundary.",
+  "tasks": [
+    {
+      "id": "CLI-01",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-01_go-executable-and-quality-baseline.md",
+      "phase": "CLI",
+      "scope": "Go executable and quality baseline",
+      "depends_on": [
+        "S00"
+      ]
+    },
+    {
+      "id": "CLI-02",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-02_configuration,-paths-and-local-state-primitives.md",
+      "phase": "CLI",
+      "scope": "Configuration, paths and local state primitives",
+      "depends_on": [
+        "CLI-01"
+      ]
+    },
+    {
+      "id": "CLI-03",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-03_typed-rest-and-sse-transport.md",
+      "phase": "CLI",
+      "scope": "Typed REST and SSE transport",
+      "depends_on": [
+        "CLI-01",
+        "S01"
+      ]
+    },
+    {
+      "id": "CLI-04",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-04_authentication-and-persisted-sessions.md",
+      "phase": "CLI",
+      "scope": "Authentication and persisted sessions",
+      "depends_on": [
+        "CLI-02",
+        "CLI-03"
+      ]
+    },
+    {
+      "id": "CLI-05",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-05_project-and-conversation-resource-commands.md",
+      "phase": "CLI",
+      "scope": "Project and conversation resource commands",
+      "depends_on": [
+        "CLI-03",
+        "CLI-04"
+      ]
+    },
+    {
+      "id": "CLI-06",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-06_sticky-context-selection-and-resolution.md",
+      "phase": "CLI",
+      "scope": "Sticky context selection and resolution",
+      "depends_on": [
+        "CLI-02",
+        "CLI-05"
+      ]
+    },
+    {
+      "id": "CLI-07",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-07_recovery-journal-and-run-inspection.md",
+      "phase": "CLI",
+      "scope": "Recovery journal and run inspection",
+      "depends_on": [
+        "CLI-02",
+        "CLI-03",
+        "CLI-04"
+      ]
+    },
+    {
+      "id": "CLI-08",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-08_one-shot-inference-and-complete-history-export.md",
+      "phase": "CLI",
+      "scope": "One-shot inference and complete history export",
+      "depends_on": [
+        "CLI-03",
+        "CLI-04",
+        "CLI-05",
+        "CLI-06",
+        "CLI-07"
+      ]
+    },
+    {
+      "id": "CLI-09",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-09_bubble-tea-shell-and-terminal-lifecycle.md",
+      "phase": "CLI",
+      "scope": "Bubble Tea shell and terminal lifecycle",
+      "depends_on": [
+        "CLI-01",
+        "CLI-02"
+      ]
+    },
+    {
+      "id": "CLI-10",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-10_composer-and-resource-selectors.md",
+      "phase": "CLI",
+      "scope": "Composer and resource selectors",
+      "depends_on": [
+        "CLI-05",
+        "CLI-09"
+      ]
+    },
+    {
+      "id": "CLI-11",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-11_paged-canonical-message-store.md",
+      "phase": "CLI",
+      "scope": "Paged canonical message store",
+      "depends_on": [
+        "CLI-03",
+        "CLI-09"
+      ]
+    },
+    {
+      "id": "CLI-12A",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-12A_viewport-scrolling.md",
+      "phase": "CLI",
+      "scope": "Viewport pagination, stable anchor and scrolling behavior",
+      "depends_on": [
+        "CLI-09",
+        "CLI-11"
+      ]
+    },
+    {
+      "id": "CLI-12B",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-12B_markdown-render-cache.md",
+      "phase": "CLI",
+      "scope": "Markdown rendering, width/theme cache, bounded visual window",
+      "depends_on": [
+        "CLI-12A"
+      ]
+    },
+    {
+      "id": "CLI-13",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-13_semantic-themes-and-appearance-controls.md",
+      "phase": "CLI",
+      "scope": "Semantic themes and appearance controls",
+      "depends_on": [
+        "CLI-02",
+        "CLI-09",
+        "CLI-12B"
+      ]
+    },
+    {
+      "id": "CLI-14",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-14_run-streaming-and-tui-presentation-state-machine.md",
+      "phase": "CLI",
+      "scope": "Run streaming and TUI presentation state machine",
+      "depends_on": [
+        "CLI-03",
+        "CLI-09",
+        "CLI-10",
+        "CLI-11",
+        "CLI-12B"
+      ]
+    },
+    {
+      "id": "CLI-15",
+      "type": "feature",
+      "component": "cli",
+      "file": "cli/tasks/CLI-15_cancellation,-conflicts-and-recovery-ux.md",
+      "phase": "CLI",
+      "scope": "Cancellation, conflicts and recovery UX",
+      "depends_on": [
+        "CLI-04",
+        "CLI-07",
+        "CLI-10",
+        "CLI-14"
+      ]
+    },
+    {
+      "id": "CLI-16A",
+      "type": "verification",
+      "component": "cli",
+      "file": "cli/tasks/CLI-16A_e2e.md",
+      "phase": "Release",
+      "scope": "Compiled CLI/backend end-to-end acceptance",
+      "depends_on": [
+        "CLI-15",
+        "T28",
+        "T34"
+      ]
+    },
+    {
+      "id": "CLI-16B",
+      "type": "verification",
+      "component": "cli",
+      "file": "cli/tasks/CLI-16B_performance-portability.md",
+      "phase": "Release",
+      "scope": "Terminal/PTY performance and Linux/macOS platform conformance",
+      "depends_on": [
+        "CLI-12B",
+        "CLI-14",
+        "CLI-15"
+      ]
+    },
+    {
+      "id": "CLI-16C",
+      "type": "release",
+      "component": "cli",
+      "file": "cli/tasks/CLI-16C_packaging.md",
+      "phase": "Release",
+      "scope": "Go CLI binary archives, checksums, native platform installation",
+      "depends_on": [
+        "CLI-16A",
+        "CLI-16B"
+      ]
+    },
+    {
+      "id": "DEPLOY-01",
+      "type": "integration",
+      "component": "deployment",
+      "file": "docs/governance/tasks/DEPLOY-01_complete-installation.md",
+      "phase": "Release",
+      "scope": "Complete local Compose application installer, upgrade and restore acceptance",
+      "depends_on": [
+        "T02",
+        "T37",
+        "T39",
+        "T40",
+        "CLI-16C",
+        "T28"
+      ]
+    },
+    {
+      "id": "S00",
+      "type": "foundation",
+      "component": "shared",
+      "file": "docs/governance/tasks/S00_monorepo-bootstrap.md",
+      "phase": "Foundation",
+      "scope": "Monorepo root tooling, GitHub protection and CI skeleton",
+      "depends_on": []
+    },
+    {
+      "id": "S01",
+      "type": "foundation",
+      "component": "shared",
+      "file": "docs/governance/tasks/S01_shared-contract-foundation.md",
+      "phase": "Foundation",
+      "scope": "Validate, approve and freeze single canonical OpenAPI/SSE/errors/fixtures manifest",
+      "depends_on": [
+        "S00"
+      ]
+    },
+    {
+      "id": "T01",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T01_python-toolchain.md",
+      "phase": "M1",
+      "scope": "Python project and quality toolchain",
+      "depends_on": [
+        "S00"
+      ]
+    },
+    {
+      "id": "T02",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T02_compose-foundation.md",
+      "phase": "M1",
+      "scope": "Compose and service isolation",
+      "depends_on": [
+        "T01"
+      ]
+    },
+    {
+      "id": "T03",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T03_flyway-roles.md",
+      "phase": "M1",
+      "scope": "Flyway bootstrap and database roles",
+      "depends_on": [
+        "T02"
+      ]
+    },
+    {
+      "id": "T04",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T04_auth-schema.md",
+      "phase": "M1",
+      "scope": "User, identity and session schema",
+      "depends_on": [
+        "T03"
+      ]
+    },
+    {
+      "id": "T05",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T05_archive-core-schema.md",
+      "phase": "M1",
+      "scope": "Conversation and project schema",
+      "depends_on": [
+        "T04"
+      ]
+    },
+    {
+      "id": "T06",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T06_branch-schema.md",
+      "phase": "M1",
+      "scope": "Immutable branch snapshot schema",
+      "depends_on": [
+        "T05"
+      ]
+    },
+    {
+      "id": "T07",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T07_runtime-schema.md",
+      "phase": "M1",
+      "scope": "Runs jobs outbox and idempotency schema",
+      "depends_on": [
+        "T06"
+      ]
+    },
+    {
+      "id": "T08",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T08_auth-service.md",
+      "phase": "M2",
+      "scope": "Local provisioning and session service",
+      "depends_on": [
+        "T04"
+      ]
+    },
+    {
+      "id": "T09",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T09_auth-http.md",
+      "phase": "M2",
+      "scope": "Auth HTTP endpoints and session guards",
+      "depends_on": [
+        "T08",
+        "S01"
+      ]
+    },
+    {
+      "id": "T10",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T10_conversation-domain.md",
+      "phase": "M2",
+      "scope": "Conversation/project services and repositories",
+      "depends_on": [
+        "T05",
+        "T06"
+      ]
+    },
+    {
+      "id": "T11",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T11_conversation-http.md",
+      "phase": "M2",
+      "scope": "Conversation/project REST resources",
+      "depends_on": [
+        "T09",
+        "T10",
+        "S01"
+      ]
+    },
+    {
+      "id": "T12",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T12_message-submit.md",
+      "phase": "M2",
+      "scope": "Atomic message submission and idempotency",
+      "depends_on": [
+        "T07",
+        "T10",
+        "T11"
+      ]
+    },
+    {
+      "id": "T13",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T13_inference-contract.md",
+      "phase": "M3",
+      "scope": "Inference provider protocol and deterministic fake",
+      "depends_on": [
+        "T01"
+      ]
+    },
+    {
+      "id": "T14",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T14_context-assembler.md",
+      "phase": "M3",
+      "scope": "Pure working-context assembler",
+      "depends_on": [
+        "T10",
+        "T13"
+      ]
+    },
+    {
+      "id": "T15",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T15_ollama-adapter.md",
+      "phase": "M3",
+      "scope": "Ollama provider implementation",
+      "depends_on": [
+        "T02",
+        "T13"
+      ]
+    },
+    {
+      "id": "T16",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T16_run-executor.md",
+      "phase": "M3",
+      "scope": "Durable run execution and checkpoints",
+      "depends_on": [
+        "T07",
+        "T12",
+        "T13",
+        "T14"
+      ]
+    },
+    {
+      "id": "T17",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T17_event-bus.md",
+      "phase": "M3",
+      "scope": "In-process event publisher and bounded subscriptions",
+      "depends_on": [
+        "T13"
+      ]
+    },
+    {
+      "id": "T18",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T18_sse-delivery.md",
+      "phase": "M3",
+      "scope": "SSE run stream snapshot handoff",
+      "depends_on": [
+        "T16",
+        "T17",
+        "S01"
+      ]
+    },
+    {
+      "id": "T19",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T19_run-control.md",
+      "phase": "M3",
+      "scope": "Run status cancellation and interruption endpoints",
+      "depends_on": [
+        "T16",
+        "T18",
+        "S01"
+      ]
+    },
+    {
+      "id": "T20",
+      "type": "verification",
+      "component": "backend",
+      "file": "backend/milestones/T20_shared-api-schema.md",
+      "phase": "M4",
+      "scope": "Server conformance to already approved /contracts, no schema invention",
+      "depends_on": [
+        "S01",
+        "T09",
+        "T11",
+        "T18",
+        "T19"
+      ]
+    },
+    {
+      "id": "T21",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T21_standalone-run-domain.md",
+      "phase": "M4",
+      "scope": "Standalone durable inference domain",
+      "depends_on": [
+        "T07",
+        "T13",
+        "T14",
+        "T16"
+      ]
+    },
+    {
+      "id": "T22",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T22_standalone-run-http.md",
+      "phase": "M4",
+      "scope": "Standalone inference HTTP submission",
+      "depends_on": [
+        "T20",
+        "T21",
+        "T12",
+        "S01"
+      ]
+    },
+    {
+      "id": "T23",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T23_operation-recovery.md",
+      "phase": "M4",
+      "scope": "Accepted-operation lookup and recovery",
+      "depends_on": [
+        "T07",
+        "T12",
+        "T20",
+        "S01"
+      ]
+    },
+    {
+      "id": "T24",
+      "type": "verification",
+      "component": "backend",
+      "file": "backend/milestones/T24_silent-session-renewal.md",
+      "phase": "M4",
+      "scope": "session renewal conformance (no duplicate auth implementation)",
+      "depends_on": [
+        "T04",
+        "T08",
+        "T09",
+        "T20"
+      ]
+    },
+    {
+      "id": "T25",
+      "type": "verification",
+      "component": "backend",
+      "file": "backend/milestones/T25_conversation-project-reassignment.md",
+      "phase": "M4",
+      "scope": "project reassignment conformance (T10/T11 implement)",
+      "depends_on": [
+        "T10",
+        "T11",
+        "T20"
+      ]
+    },
+    {
+      "id": "T26",
+      "type": "verification",
+      "component": "backend",
+      "file": "backend/milestones/T26_conversation-creation-and-selection.md",
+      "phase": "M4",
+      "scope": "idempotent conversation creation conformance (T11 implements)",
+      "depends_on": [
+        "T10",
+        "T11",
+        "T12",
+        "T20"
+      ]
+    },
+    {
+      "id": "T27",
+      "type": "verification",
+      "component": "backend",
+      "file": "backend/milestones/T27_run-recovery-contract.md",
+      "phase": "M4",
+      "scope": "run snapshot/status/cancellation conformance (T18/T19 implement)",
+      "depends_on": [
+        "T18",
+        "T19",
+        "T20",
+        "T21",
+        "T22"
+      ]
+    },
+    {
+      "id": "T28",
+      "type": "verification",
+      "component": "backend",
+      "file": "backend/milestones/T28_backend-client-contract-gate.md",
+      "phase": "M4",
+      "scope": "backend API/consumer protocol verification",
+      "depends_on": [
+        "T20",
+        "T22",
+        "T23",
+        "T24",
+        "T25",
+        "T26",
+        "T27"
+      ]
+    },
+    {
+      "id": "T29",
+      "type": "spike",
+      "component": "backend",
+      "file": "backend/milestones/T29_mem0-spike.md",
+      "phase": "M5",
+      "scope": "Pinned Mem0 OSS compatibility spike",
+      "depends_on": [
+        "T02",
+        "T13"
+      ]
+    },
+    {
+      "id": "T30",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T30_memory-port.md",
+      "phase": "M5",
+      "scope": "Minimal memory service protocol and fake",
+      "depends_on": [
+        "T13"
+      ]
+    },
+    {
+      "id": "T31",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T31_mem0-adapter.md",
+      "phase": "M5",
+      "scope": "Mem0 adapter with tenant protection",
+      "depends_on": [
+        "T29",
+        "T30"
+      ]
+    },
+    {
+      "id": "T32",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T32_job-queue.md",
+      "phase": "M5",
+      "scope": "PostgreSQL jobs and lease claims",
+      "depends_on": [
+        "T07"
+      ]
+    },
+    {
+      "id": "T33",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T33_memory-ingestion.md",
+      "phase": "M5",
+      "scope": "Asynchronous committed-turn memory ingest",
+      "depends_on": [
+        "T12",
+        "T31",
+        "T32"
+      ]
+    },
+    {
+      "id": "T34",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T34_memory-read.md",
+      "phase": "M5",
+      "scope": "Orchestrator memory search and degraded mode",
+      "depends_on": [
+        "T14",
+        "T16",
+        "T31",
+        "T30"
+      ]
+    },
+    {
+      "id": "T35",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T35_account-purge.md",
+      "phase": "M6",
+      "scope": "Full user purge and deletion fences",
+      "depends_on": [
+        "T08",
+        "T31",
+        "T32"
+      ]
+    },
+    {
+      "id": "T36",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T36_archive-deletion.md",
+      "phase": "M6",
+      "scope": "Conversation/archive deletion semantics",
+      "depends_on": [
+        "T10",
+        "T33"
+      ]
+    },
+    {
+      "id": "T37",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T37_backups.md",
+      "phase": "M6",
+      "scope": "Encrypted backups and restoration runbook",
+      "depends_on": [
+        "T02",
+        "T31",
+        "T35"
+      ]
+    },
+    {
+      "id": "T38",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T38_telemetry.md",
+      "phase": "M6",
+      "scope": "Structured logs, traces and queue diagnostics",
+      "depends_on": [
+        "T19",
+        "T32"
+      ]
+    },
+    {
+      "id": "T39",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T39_operational-hardening.md",
+      "phase": "M6",
+      "scope": "Restart, shutdown and failure handling",
+      "depends_on": [
+        "T16",
+        "T32",
+        "T36",
+        "T37"
+      ]
+    },
+    {
+      "id": "T40",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T40_integration-review.md",
+      "phase": "M7",
+      "scope": "Security and full-workflow review",
+      "depends_on": [
+        "T28",
+        "T34",
+        "T35",
+        "T36",
+        "T37",
+        "T38",
+        "T39"
+      ]
+    },
+    {
+      "id": "T41",
+      "type": "feature",
+      "component": "backend",
+      "file": "backend/milestones/T41_release-gate.md",
+      "phase": "M7",
+      "scope": "Release documentation and evidence",
+      "depends_on": [
+        "T40"
+      ]
+    }
+  ]
+}
