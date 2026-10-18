@@ -434,6 +434,8 @@ def test_explicit_linux_host_ollama_endpoint(stack: Stack) -> None:
         "no-new-privileges:true",
         "-e",
         f"OLLAMA_HOST={gateway}:11434",
+        "-e",
+        "OLLAMA_NO_CLOUD=true",
         "-v",
         f"{stack.project}_ollama:/root/.ollama",
         stack.model["services"]["ollama"]["image"],

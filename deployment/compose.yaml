@@ -20,7 +20,11 @@ services:
         published: "8000"
         host_ip: 127.0.0.1
         protocol: tcp
-    networks: [private]
+    # Docker does not publish ports from an internal-only network. Data services
+    # remain internal; only the backend joins the host-facing API bridge.
+    networks: [private, api]
+    sysctls:
+      net.ipv4.ip_forward: "0"
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,6 +67,8 @@ services:
       - qdrant_data:/qdrant/storage
       - ./qdrant-entrypoint.sh:/mimir/qdrant-entrypoint.sh:ro
     secrets: [qdrant_api_key]
+    environment:
+      QDRANT__TELEMETRY_DISABLED: "true"
 
   ollama:
     image: ollama/ollama:0.40.6@sha256:265409e1d931028a8f7d5a32bcbafddd7bffbc6cc629d77efe9560adf692a5e7
@@ -72,6 +78,7 @@ services:
     networks: [private]
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_NO_CLOUD: "true"
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
@@ -84,6 +91,11 @@ services:
 networks:
   private:
     internal: true
+  api:
+    driver: bridge
+    internal: false
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: 127.0.0.1
 
 # External volumes are not removed by Compose down, including down --volumes.
 # Provision them explicitly before first start; there is no destructive lifecycle.

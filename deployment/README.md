@@ -14,12 +14,20 @@ The backend image installs only the locked runtime package; Compose runs it as
 65532:65532, drops capabilities and makes its filesystem read-only. Build context
 is allowlisted, excluding host environments, secrets and caches.
 
+Qdrant telemetry and Ollama cloud features are explicitly disabled using the
+configuration supported by the pinned vendor releases.
+
 The backend is wiring in a disabled `backend` profile. Its sole host binding is
 `127.0.0.1:8000`; data/model services have no published ports. There is no server
 entrypoint, idle placeholder or fake health response. Even explicit activation
 fails without a command. Later application tasks must supply the real server
 and compatible-schema readiness gate. T03 owns Flyway/roles: no runner or SQL is
 implemented here, and no bootstrap administrator secret is given to the backend.
+
+Only the backend also joins an API bridge, whose default host binding is
+127.0.0.1. Docker suppresses host publishing for an internal-only network; this
+separate bridge supplies the publishing path. Data/model services attach only
+to the internal network, and backend IPv4 forwarding is explicitly disabled.
 
 Qdrant requires a file-backed API key; PostgreSQL TCP authentication uses SCRAM.
 Wrappers read protected 0600 files before invoking upstream entrypoints, keeping
@@ -33,7 +41,9 @@ credentials do not implement Mimir user/session authentication.
 Requires Docker Engine access, Compose **5.5.1** (tested and pinned in CI), uv
 0.12.10 and Python 3.14.7. Commands below run from the monorepo root. Setup
 explicitly downloads pinned service/build images and locked tooling, not models.
-The runtime private network has no external egress.
+The data/model private network has no external egress. The backend's separate API
+bridge is a standard Docker bridge; it does not provide an egress firewall for
+future application code or authorize hosted inference.
 
 Create secrets once. This refuses an existing directory and never overwrites
 credentials during restart or upgrade:
@@ -85,7 +95,7 @@ docker network inspect mimir_private --format '{{(index .IPAM.Config 0).Gateway}
 
 Set `MIMIR_HOST_OLLAMA_IP` to that address. In another terminal, explicitly run
 the selected host Ollama binary (0.40.6) with
-`OLLAMA_HOST="$MIMIR_HOST_OLLAMA_IP:11434" ollama serve`. Bind only that dedicated
+`OLLAMA_NO_CLOUD=true OLLAMA_HOST="$MIMIR_HOST_OLLAMA_IP:11434" ollama serve`. Bind only that dedicated
 bridge address, never a LAN/wildcard interface. Then validate and select the mode:
 
 ```sh

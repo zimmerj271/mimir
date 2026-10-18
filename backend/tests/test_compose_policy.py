@@ -38,9 +38,11 @@ def config(tmp_path: Path) -> dict:
         {
             "entrypoint": ["/bin/sh", "/mimir/qdrant-entrypoint.sh"],
             "cap_add": ["DAC_OVERRIDE"],
+            "environment": {"QDRANT__TELEMETRY_DISABLED": "true"},
             "secrets": [{"source": "qdrant_api_key"}],
         }
     )
+    services["ollama"]["environment"] = {"OLLAMA_NO_CLOUD": "true"}
     services["backend"] = {
         "profiles": ["backend"],
         "entrypoint": [],
@@ -49,7 +51,8 @@ def config(tmp_path: Path) -> dict:
         "read_only": True,
         "cap_drop": ["ALL"],
         "security_opt": ["no-new-privileges:true"],
-        "networks": {"private": None},
+        "networks": {"private": None, "api": None},
+        "sysctls": {"net.ipv4.ip_forward": "0"},
         "ports": [{"host_ip": "127.0.0.1", "target": 8000, "protocol": "tcp"}],
     }
     secrets = {}
@@ -62,7 +65,16 @@ def config(tmp_path: Path) -> dict:
         "name": "fixture",
         "services": services,
         "secrets": secrets,
-        "networks": {"private": {"internal": True}},
+        "networks": {
+            "private": {"internal": True},
+            "api": {
+                "internal": False,
+                "driver": "bridge",
+                "driver_opts": {
+                    "com.docker.network.bridge.host_binding_ipv4": "127.0.0.1"
+                },
+            },
+        },
         "volumes": {
             f"{role}_data": {"name": f"fixture_{role}", "external": True}
             for role in ("postgres", "qdrant", "ollama")
@@ -74,6 +86,9 @@ def test_valid_policy_and_protected_files(config: dict) -> None:
     policy = ComposePolicy()
     policy.validate(config)
     policy.validate_secret_file(config)
+    # Compose omits false/default network fields in normalized JSON.
+    config["networks"]["api"].pop("internal")
+    policy.validate(config)
 
 
 @pytest.mark.parametrize(
@@ -97,6 +112,10 @@ def test_valid_policy_and_protected_files(config: dict) -> None:
         "backend_root",
         "qdrant_no_key",
         "host_mount",
+        "peer_api_network",
+        "backend_routing",
+        "qdrant_telemetry",
+        "ollama_cloud",
     ],
 )
 def test_reject_unsafe_compose_models(config: dict, fault: str) -> None:
@@ -139,6 +158,14 @@ def test_reject_unsafe_compose_models(config: dict, fault: str) -> None:
         services["backend"]["user"] = "0:0"
     elif fault == "qdrant_no_key":
         services["qdrant"]["secrets"] = []
+    elif fault == "peer_api_network":
+        services["postgres"]["networks"]["api"] = None
+    elif fault == "backend_routing":
+        services["backend"]["sysctls"]["net.ipv4.ip_forward"] = "1"
+    elif fault == "qdrant_telemetry":
+        services["qdrant"]["environment"]["QDRANT__TELEMETRY_DISABLED"] = "false"
+    elif fault == "ollama_cloud":
+        services["ollama"]["environment"]["OLLAMA_NO_CLOUD"] = "false"
     else:
         services["qdrant"]["volumes"].append(
             {"type": "bind", "source": "/", "target": "/host"}

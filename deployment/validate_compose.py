@@ -46,10 +46,22 @@ class ComposePolicy:
             expected.add("ollama")
         require(set(services) == expected, "unexpected/missing services or Ollama mode")
         networks = mapping(config.get("networks"))
-        require(set(networks) == {"private"}, "only the private network is allowed")
+        require(set(networks) == {"private", "api"}, "unexpected deployment networks")
         require(
             mapping(networks["private"]).get("internal") is True,
             "private network must be externally isolated",
+        )
+        api = mapping(networks["api"])
+        require(
+            api.get("internal", False) is False and api.get("driver") == "bridge",
+            "API publishing requires the dedicated bridge",
+        )
+        require(
+            mapping(api.get("driver_opts")).get(
+                "com.docker.network.bridge.host_binding_ipv4"
+            )
+            == "127.0.0.1",
+            "API bridge default host binding must be loopback",
         )
         volumes = mapping(config.get("volumes"))
         roles = (
@@ -82,7 +94,8 @@ class ComposePolicy:
                 f"{name}: unexpected additional capabilities",
             )
             require(
-                set(mapping(service.get("networks"))) == {"private"},
+                set(mapping(service.get("networks")))
+                == ({"private", "api"} if name == "backend" else {"private"}),
                 f"{name}: unexpected network attachment",
             )
             require(
@@ -151,6 +164,19 @@ class ComposePolicy:
             )
         qdrant = mapping(services["qdrant"])
         require(
+            mapping(qdrant.get("environment", {})).get("QDRANT__TELEMETRY_DISABLED")
+            == "true",
+            "Qdrant telemetry must be disabled",
+        )
+        if "ollama" in services:
+            require(
+                mapping(mapping(services["ollama"]).get("environment", {})).get(
+                    "OLLAMA_NO_CLOUD"
+                )
+                == "true",
+                "Ollama cloud features must be disabled",
+            )
+        require(
             qdrant.get("entrypoint") == ["/bin/sh", "/mimir/qdrant-entrypoint.sh"],
             "Qdrant must load file-backed credentials",
         )
@@ -206,6 +232,10 @@ class ComposePolicy:
                     )
 
     def _backend(self, service: dict[str, object], host_gateway: str | None) -> None:
+        require(
+            mapping(service.get("sysctls")) == {"net.ipv4.ip_forward": "0"},
+            "backend must not route between the API and private networks",
+        )
         require(
             service.get("profiles") == ["backend"],
             "backend must remain explicitly disabled",
