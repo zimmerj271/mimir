@@ -55,7 +55,7 @@ database-validate:
 	cd backend && uv run --locked python ../deployment/migrate.py validate
 
 database-check:
-	cd backend && uv run --locked pytest -c pyproject.toml ../tests/integration/test_database.py -q
+	cd backend && uv run --locked pytest -c pyproject.toml ../tests/integration/test_database.py -q --cov-reset --cov=migrate --cov=validate_compose
 
 cli-check:
 	@test -f cli/go.mod || { echo 'NOT IMPLEMENTED: CLI-01 owns the Go toolchain'; exit 1; }

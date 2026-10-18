@@ -135,11 +135,18 @@ class DatabaseStack:
 
     def start(self) -> None:
         self.docker("info")
+        assert not self.docker(
+            "ps", "-aq", "--filter", f"label=com.docker.compose.project={self.project}"
+        ).stdout.strip(), "test project collision"
         assert (
             self.docker("volume", "inspect", self.volume, check=False).returncode != 0
         ), "test volume collision"
         self.docker(
             "volume", "create", "--label", f"mimir.t03_test={self.token}", self.volume
+        )
+        details = json.loads(self.docker("volume", "inspect", self.volume).stdout)[0]
+        assert details.get("Labels", {}).get("mimir.t03_test") == self.token, (
+            "test volume ownership mismatch"
         )
         self.owns = True
         self.compose("up", "-d", "--wait", "postgres")
@@ -240,6 +247,14 @@ def test_role_catalog_and_separate_logins(database: DatabaseStack) -> None:
             database.sql("SELECT current_user", f"mimir_{role}").stdout.strip()
             == f"mimir_{role}"
         )
+    for role in RUNTIME:
+        for other in ("postgres", "template1"):
+            assert (
+                database.sql(
+                    "SELECT 1", f"mimir_{role}", check=False, database=other
+                ).returncode
+                != 0
+            )
     # Runtime roles have no memberships, including no implicit owner/migration path.
     assert (
         database.sql(
@@ -320,12 +335,20 @@ def test_default_grants_and_forced_rls_under_real_logins(
                 ).returncode
                 != 0
             )
+            forged = database.sql(
+                "BEGIN; SET LOCAL app.current_user_id='00000000-0000-0000-0000-000000000001'; INSERT INTO archive.t03_rls_probe VALUES ('00000000-0000-0000-0000-000000000002',1); COMMIT;",
+                login,
+                check=False,
+            )
+            assert forged.returncode != 0
+            assert "row-level security" in forged.stderr
             # Reuse one session, change actor only transaction-locally, then clear.
             result = database.sql(
                 """
                 BEGIN;
                 SET LOCAL app.current_user_id='00000000-0000-0000-0000-000000000001';
                 INSERT INTO archive.t03_rls_probe VALUES ('00000000-0000-0000-0000-000000000001',1);
+                SELECT count(*) FROM archive.t03_rls_probe WHERE user_id='00000000-0000-0000-0000-000000000001';
                 COMMIT;
                 SELECT count(*) FROM archive.t03_rls_probe;
                 BEGIN;
@@ -335,7 +358,8 @@ def test_default_grants_and_forced_rls_under_real_logins(
             """,
                 login,
             )
-            assert result.stdout.splitlines() == ["0", "0"]
+            assert result.stdout.splitlines()[-2:] == ["0", "0"]
+            assert int(result.stdout.splitlines()[0]) >= 1
             assert (
                 database.sql(
                     "ALTER TABLE archive.t03_rls_probe DISABLE ROW LEVEL SECURITY",
@@ -389,13 +413,17 @@ def test_checksum_drift_fails_without_repair(database: DatabaseStack) -> None:
     database.flyway("validate")
 
 
-def test_incremental_failure_transaction_and_recovery(database: DatabaseStack) -> None:
-    # A test-only V002 exercises an upgrade path; T04 owns the real V002.
-    probe = database.migrations / "V002__test_only_transaction.sql"
-    probe.write_text(
-        "SET ROLE mimir_owner; CREATE TABLE runtime.t03_upgrade_probe(id int); SELECT 1/0;"
-    )
+def test_incremental_failure_transaction_and_recovery(tmp_path: Path) -> None:
+    # A dedicated test-only V002 exercises upgrade; T04 owns the real V002.
+    # Destroy the owned test stack afterwards rather than editing successful history.
+    database = DatabaseStack(tmp_path)
     try:
+        database.start()
+        database.migrate()
+        probe = database.migrations / "V002__test_only_transaction.sql"
+        probe.write_text(
+            "SET ROLE mimir_owner; CREATE TABLE runtime.t03_upgrade_probe(id int); SELECT 1/0;"
+        )
         assert database.flyway("migrate", check=False).returncode != 0
         assert (
             database.sql(
@@ -409,9 +437,9 @@ def test_incremental_failure_transaction_and_recovery(database: DatabaseStack) -
             ).stdout.strip()
             == "0"
         )
-        # PostgreSQL rolled back the failed transaction; no repair or baseline.
+        # Only failed/unapplied SQL is corrected. PostgreSQL rolled back history/DDL.
         probe.write_text(
-            "SET ROLE mimir_owner; CREATE TABLE runtime.t03_upgrade_probe(id int);"
+            "SET ROLE mimir_owner; CREATE TABLE runtime.t03_upgrade_probe(id int); RESET ROLE;"
         )
         database.flyway("migrate")
         database.flyway("validate")
@@ -421,13 +449,37 @@ def test_incremental_failure_transaction_and_recovery(database: DatabaseStack) -
             ).stdout.strip()
             == "mimir_owner"
         )
+        assert database.sql(
+            "SELECT version FROM public.flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank"
+        ).stdout.splitlines() == ["001", "002"]
     finally:
-        # Remove only the successful test fixture and its test-only history row.
-        database.sql(
-            "DROP TABLE IF EXISTS runtime.t03_upgrade_probe; DELETE FROM public.flyway_schema_history WHERE version='002'"
+        database.cleanup()
+
+
+def test_reject_incompatible_role_and_unversioned_schema(tmp_path: Path) -> None:
+    database = DatabaseStack(tmp_path)
+    try:
+        database.start()
+        database.sql("CREATE ROLE mimir_migrator SUPERUSER LOGIN", database="postgres")
+        result = database.compose(
+            "run", "--rm", "--no-deps", "-T", "role-bootstrap", check=False
         )
-        probe.unlink()
-    database.flyway("validate")
+        assert result.returncode != 0
+        assert "incompatible" in result.stderr
+        database.sql("DROP ROLE mimir_migrator", database="postgres")
+        database.compose("run", "--rm", "--no-deps", "-T", "role-bootstrap")
+        database.sql("CREATE TABLE public.t03_unversioned(id int)")
+        result = database.flyway("migrate", check=False)
+        assert result.returncode != 0
+        assert "non-empty" in (result.stdout + result.stderr).lower()
+        assert (
+            database.sql(
+                "SELECT count(*) FROM pg_roles WHERE rolname='mimir_owner'"
+            ).stdout.strip()
+            == "0"
+        )
+    finally:
+        database.cleanup()
 
 
 def test_bad_credentials_and_no_silent_rotation(database: DatabaseStack) -> None:

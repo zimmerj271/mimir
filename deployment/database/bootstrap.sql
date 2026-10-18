@@ -1,6 +1,9 @@
 -- Administrative, non-versioned cluster provisioning; never application DDL.
 -- Serialize concurrent provisioning, including CREATE DATABASE outside a txn.
 SELECT pg_advisory_lock(1877347689, 3);
+-- This is a dedicated Mimir cluster; ordinary logins must not create temporary
+-- objects by connecting to the maintenance/template databases.
+REVOKE ALL ON DATABASE postgres, template1 FROM PUBLIC;
 SELECT 'CREATE ROLE mimir_migrator LOGIN NOSUPERUSER NOCREATEDB CREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS'
 WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'mimir_migrator')
 \gexec

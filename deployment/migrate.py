@@ -104,6 +104,11 @@ class MigrationPolicy:
             ),
             "migration job host access/overrides forbidden",
         )
+        require(
+            service.get("tmpfs")
+            == ["/tmp:rw,noexec,nosuid,size=" + ("64m" if name == "flyway" else "16m")],
+            "migration tmpfs must be bounded and non-executable",
+        )
         entry = "flyway.sh" if name == "flyway" else "provision.sh"
         require(
             service.get("entrypoint") == ["/bin/sh", f"/mimir/database/{entry}"],

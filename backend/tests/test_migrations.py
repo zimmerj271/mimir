@@ -49,6 +49,7 @@ def migration_config(config: dict, tmp_path: Path) -> dict:
         config["services"][name] = {
             "profiles": ["migrations"],
             "image": FLYWAY_IMAGE if flyway else PG_IMAGE,
+            "tmpfs": ["/tmp:rw,noexec,nosuid,size=" + ("64m" if flyway else "16m")],
             "restart": "no",
             "user": "0:0",
             "read_only": True,
@@ -119,6 +120,7 @@ def test_compiled_migration_policy(migration_config: dict) -> None:
         "entrypoint",
         "root_write",
         "additional_service",
+        "tmpfs",
     ],
 )
 def test_reject_unsafe_migration_model(migration_config: dict, fault: str) -> None:
@@ -160,6 +162,8 @@ def test_reject_unsafe_migration_model(migration_config: dict, fault: str) -> No
                 "read_only": True,
             }
         )
+    elif fault == "tmpfs":
+        job["tmpfs"] = ["/tmp:rw", "noexec", "nosuid", "size=64m"]
     elif fault == "entrypoint":
         job["entrypoint"] = ["/bin/sh"]
     elif fault == "root_write":

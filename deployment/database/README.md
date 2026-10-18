@@ -19,7 +19,8 @@ Authority: [T03](../../backend/milestones/T03_flyway-roles.md),
 
 All runtime roles are NOINHERIT, NOCREATEROLE, NOCREATEDB, NOREPLICATION,
 NOSUPERUSER and NOBYPASSRLS, with no memberships. TEMP and public schema access
-are revoked. Runtime search paths contain only pg_catalog; future application SQL
+are revoked, including public access to the postgres/template1 maintenance
+databases. Runtime search paths contain only pg_catalog; future application SQL
 must qualify domain schema names. Later tasks grant object-specific privileges
 and restricted worker/maintenance procedures; no blanket default DML is granted.
 Function EXECUTE defaults for owner-created objects are revoked from PUBLIC.

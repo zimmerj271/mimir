@@ -12,7 +12,7 @@ services:
     networks: [private]
     entrypoint: [/bin/sh, /mimir/database/provision.sh]
     command: [bootstrap]
-    tmpfs: [/tmp:rw,noexec,nosuid,size=16m]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
     secrets: [postgres_bootstrap_password, mimir_migrator_password]
     volumes:
       - ./database:/mimir/database:ro
@@ -32,7 +32,7 @@ services:
     networks: [private]
     entrypoint: [/bin/sh, /mimir/database/flyway.sh]
     command: [migrate]
-    tmpfs: [/tmp:rw,noexec,nosuid,size=64m]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
     secrets: [mimir_migrator_password]
     volumes:
       - ./database/flyway.sh:/mimir/database/flyway.sh:ro
@@ -68,7 +68,7 @@ services:
     networks: [private]
     entrypoint: [/bin/sh, /mimir/database/provision.sh]
     command: [credentials]
-    tmpfs: [/tmp:rw,noexec,nosuid,size=16m]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
     secrets:
       - postgres_bootstrap_password
       - mimir_api_password
