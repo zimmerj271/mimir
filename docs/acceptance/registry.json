@@ -924,6 +924,31 @@
         "backend/tests/test_environment.py",
         "tests/governance/test_checks.py"
       ]
+    },
+    "T03": {
+      "specification": "backend/milestones/T03_flyway-roles.md",
+      "requirements": [
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "DB-ROLE-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-02"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "DB-MIG-01"
+        }
+      ],
+      "tests": [
+        "backend/tests/test_migrations.py",
+        "tests/integration/test_database.py"
+      ]
     }
   }
 }

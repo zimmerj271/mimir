@@ -43,6 +43,9 @@ jobs:
       - name: Real service isolation and persistence
         if: matrix.os == 'ubuntu-24.04'
         run: make deployment-check
+      - name: Real PostgreSQL and Flyway roles
+        if: matrix.os == 'ubuntu-24.04'
+        run: make database-check
       - name: PR assignment and evidence
         if: github.event_name == 'pull_request'
         run: python3 scripts/check_pr.py "$GITHUB_EVENT_PATH"
@@ -52,4 +55,5 @@ jobs:
           echo 'CLI builds, race and PTY tests: NOT IMPLEMENTED (CLI-01 and successors)'
           echo 'Contract semantics/producer/consumer tests: NOT IMPLEMENTED (S01 and successors)'
           echo 'T02 real container tests run on Linux; macOS runs deterministic policy tests only'
-          echo 'Application startup, Flyway migrations and full installation remain unimplemented'
+          echo 'T03 V001 migration/role tests run on Linux; domain migrations and application startup remain later tasks'
+          echo 'Full installation and native macOS container runtime remain unverified'

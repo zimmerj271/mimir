@@ -21,8 +21,9 @@ The backend is wiring in a disabled `backend` profile. Its sole host binding is
 `127.0.0.1:8000`; data/model services have no published ports. There is no server
 entrypoint, idle placeholder or fake health response. Even explicit activation
 fails without a command. Later application tasks must supply the real server
-and compatible-schema readiness gate. T03 owns Flyway/roles: no runner or SQL is
-implemented here, and no bootstrap administrator secret is given to the backend.
+and compatible-schema readiness gate. T03 adds the explicitly selected
+[Flyway/role provisioning overlay](database/README.md); it does not run as part of
+this default T02 topology. No administrator or migration secret is given to the backend.
 
 Only the backend also joins an API bridge, whose default host binding is
 127.0.0.1. Docker suppresses host publishing for an internal-only network; this

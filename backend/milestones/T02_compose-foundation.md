@@ -1,9 +1,9 @@
 # T02 — Compose and service isolation
 
-**Milestone:** M1  
-**Branch:** `feature/t02-compose-foundation` (from updated `main`)  
-**Dependencies:** T01  
-**Status:** Implementation and applicable validation complete; submitted in [PR #3](https://github.com/zimmerj271/mimir/pull/3) for independent agent review and human review. Explicit human merge authorization pending; not merged.
+**Milestone:** M1
+**Branch:** `feature/t02-compose-foundation` (from updated `main`)
+**Dependencies:** T01
+**Status:** Implementation and applicable validation complete; submitted in [PR #3](https://github.com/zimmerj271/mimir/pull/3) for independent agent review and human review. Explicit human merge authorization completed; Merged.
 
 Acceptance IDs: DEPLOY-01 (docs/acceptance/REQUIREMENTS.md); OPS-01 supporting
 infrastructure persistence/isolation coverage only, with application checks deferred.
