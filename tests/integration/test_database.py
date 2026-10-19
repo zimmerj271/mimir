@@ -5,12 +5,16 @@ upgrade/failure migrations and RLS tables do not implement later task schemas.
 """
 
 import concurrent.futures
+import contextlib
+import hashlib
 import json
 import os
 import secrets
+import select
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -32,6 +36,8 @@ class DatabaseStack:
         self.env = os.environ.copy()
         self.env["COMPOSE_PROJECT_NAME"] = self.project
         self.passwords = {}
+        self.extra_passwords = []
+        self.calls = []
         for role in ("postgres_bootstrap", *[f"mimir_{role}" for role in ROLES]):
             path = directory / f"{role}_password"
             path.write_text(secrets.token_urlsafe(48))
@@ -101,7 +107,7 @@ class DatabaseStack:
         return result
 
     def redact(self, output: str) -> str:
-        for path in self.passwords.values():
+        for path in [*self.passwords.values(), *self.extra_passwords]:
             output = output.replace(path.read_text().strip(), "[REDACTED]")
         return output
 
@@ -114,10 +120,15 @@ class DatabaseStack:
         role: str = "postgres",
         check: bool = True,
         database: str = "mimir",
+        password: str | None = None,
     ) -> subprocess.CompletedProcess:
         # stdin carries credentials, never host argv/environment or model fields.
         secret_role = "postgres_bootstrap" if role == "postgres" else role
-        secret = self.passwords[secret_role].read_text().strip()
+        secret = (
+            password
+            if password is not None
+            else self.passwords[secret_role].read_text().strip()
+        )
         command = 'IFS= read -r PGPASSWORD; export PGPASSWORD; exec psql -XAtq -h 127.0.0.1 -U "$1" -d "$2" -v ON_ERROR_STOP=1'
         return self.compose(
             "exec",
@@ -161,7 +172,106 @@ class DatabaseStack:
             "run", "--rm", "--no-deps", "-T", "flyway", operation, check=check
         )
 
+    def credential_variant(self, role: str, password: str, tag: str) -> Path:
+        path = self.directory / f"{tag}-password"
+        path.write_text(password)
+        path.chmod(0o600)
+        self.extra_passwords.append(path)
+        model = json.loads(self.file.read_text())
+        model["secrets"][f"{role}_password"]["file"] = str(path)
+        service = "role-bootstrap" if role == "mimir_migrator" else "role-credentials"
+        model["services"][service]["environment"] = {"PGAPPNAME": tag}
+        file = self.directory / f"{tag}.json"
+        file.write_text(json.dumps(model))
+        return file
+
+    def start_call(
+        self, tag: str, *arguments: str, file: Path | None = None
+    ) -> subprocess.Popen:
+        name = f"{self.project}-{tag}"
+        process = subprocess.Popen(
+            [
+                "docker",
+                "compose",
+                "-f",
+                str(file or self.file),
+                "run",
+                "--rm",
+                "--no-deps",
+                "-T",
+                "--name",
+                name,
+                *arguments,
+            ],
+            env=self.env,
+            cwd=ROOT,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.calls.append((process, name))
+        return process
+
+    def start_helper(self, role: str, tag: str) -> subprocess.Popen:
+        # Actual reviewed helper; no injected SQL or production synchronization hook.
+        script = 'export PGAPPNAME="$1"; export PGPASSWORD="$(cat /run/secrets/postgres_bootstrap_password)"; exec psql -XAtq -h postgres -U postgres -d postgres -v ON_ERROR_STOP=1 -v role="$2" -f /mimir/database/provision-password.psql'
+        return self.start_call(
+            tag,
+            "--entrypoint",
+            "/bin/sh",
+            "role-bootstrap",
+            "-c",
+            script,
+            "sh",
+            tag,
+            role,
+        )
+
+    def credential_digest(self, role: str) -> str:
+        # Compare fingerprints so a failing assertion cannot print a SCRAM verifier.
+        verifier = self.sql(
+            f"SELECT coalesce(rolpassword, '') FROM pg_authid WHERE rolname='{role}'",
+            database="postgres",
+        ).stdout.strip()
+        return hashlib.sha256(verifier.encode()).hexdigest()
+
+    def wait_for_credential_lock(self, tags: list[str], granted: bool) -> None:
+        names = ",".join(f"'{tag}'" for tag in tags)
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            count = self.sql(
+                "SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid "
+                "WHERE l.locktype='advisory' AND l.classid=1877347689 AND l.objid=4 "
+                f"AND l.objsubid=2 AND l.granted={'true' if granted else 'false'} "
+                f"AND a.datname='postgres' AND a.application_name IN ({names})",
+                database="postgres",
+            ).stdout.strip()
+            if count == str(len(tags)):
+                return
+            time.sleep(0.05)
+        raise AssertionError(
+            "provisioning callers did not reach the expected database lock state"
+        )
+
     def cleanup(self) -> None:
+        for process, name in self.calls:
+            if process.poll() is None:
+                inspected = self.docker("inspect", name, check=False)
+                if (
+                    inspected.returncode == 0
+                    and json.loads(inspected.stdout)[0]
+                    .get("Config", {})
+                    .get("Labels", {})
+                    .get("mimir.t03_test")
+                    == self.token
+                ):
+                    self.docker("rm", "-f", name)
+                try:
+                    process.communicate(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate(timeout=10)
         if self.owns:
             self.compose("down", "--remove-orphans", check=False)
             inspected = self.docker("volume", "inspect", self.volume, check=False)
@@ -511,3 +621,198 @@ def test_migrator_wrong_password_and_secret_redaction(database: DatabaseStack) -
     model = database.file.read_text()
     for secret in database.passwords.values():
         assert secret.read_text().strip() not in model
+
+
+@contextlib.contextmanager
+def credential_lock(database: DatabaseStack):
+    """A real controller session makes contention observable rather than probabilistic."""
+    tag = f"t03-controller-{uuid.uuid4().hex[:12]}"
+    script = 'export PGAPPNAME="$1"; export PGPASSWORD="$(cat /run/secrets/postgres_bootstrap_password)"; exec psql -XAtq -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1'
+    controller = subprocess.Popen(
+        [
+            "docker",
+            "compose",
+            "-f",
+            str(database.file),
+            "exec",
+            "-T",
+            "postgres",
+            "sh",
+            "-c",
+            script,
+            "sh",
+            tag,
+        ],
+        env=database.env,
+        cwd=ROOT,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        controller.stdin.write(
+            "BEGIN; SELECT pg_advisory_xact_lock(1877347689,4); SELECT 't03-lock-ready';\n"
+        )
+        controller.stdin.flush()
+        output = b""
+        deadline = time.monotonic() + 20
+        while b"t03-lock-ready" not in output:
+            remaining = deadline - time.monotonic()
+            assert remaining > 0, "controller lock acquisition timed out"
+            readable, _, _ = select.select([controller.stdout], [], [], remaining)
+            assert readable, "controller lock acquisition timed out"
+            chunk = os.read(controller.stdout.fileno(), 4096)
+            assert chunk, "controller exited before acquiring lock"
+            output += chunk
+        yield
+    finally:
+        try:
+            controller.communicate("COMMIT;\n\\q\n", timeout=10)
+        except subprocess.TimeoutExpired, BrokenPipeError:
+            database.sql(
+                f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name='{tag}'",
+                database="postgres",
+            )
+            controller.kill()
+            controller.communicate(timeout=10)
+        assert controller.returncode == 0, "controller did not release its lock cleanly"
+
+
+@pytest.fixture(params=("mimir_migrator", "mimir_api"))
+def uninitialized_credentials(request, tmp_path: Path):
+    database = DatabaseStack(tmp_path)
+    try:
+        database.start()
+        if request.param != "mimir_migrator":
+            database.compose("run", "--rm", "--no-deps", "-T", "role-bootstrap")
+            database.flyway("migrate")
+        yield database, request.param
+    finally:
+        database.cleanup()
+
+
+@pytest.mark.parametrize("matching", (False, True), ids=("conflicting", "matching"))
+def test_concurrent_credential_initialization(
+    uninitialized_credentials, matching: bool
+) -> None:
+    database, role = uninitialized_credentials
+    service = "role-bootstrap" if role == "mimir_migrator" else "role-credentials"
+    passwords = [secrets.token_urlsafe(48), secrets.token_urlsafe(48)]
+    if matching:
+        passwords[1] = passwords[0]
+    tags = ["initializer-a", "initializer-b"]
+    files = [
+        database.credential_variant(role, password, tag)
+        for password, tag in zip(passwords, tags, strict=True)
+    ]
+    with credential_lock(database):
+        callers = [
+            database.start_call(tag, service, file=file)
+            for tag, file in zip(tags, files, strict=True)
+        ]
+        database.wait_for_credential_lock(tags, granted=False)
+        assert all(caller.poll() is None for caller in callers), (
+            "initializer bypassed the lock"
+        )
+        assert (
+            database.sql(
+                f"SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='{role}'",
+                database="postgres",
+            ).stdout.strip()
+            == "t"
+        )
+    outputs = [caller.communicate(timeout=60) for caller in callers]
+    for stdout, stderr in outputs:
+        assert all(password not in stdout + stderr for password in passwords), (
+            "plaintext credential leaked"
+        )
+    successes = [
+        index for index, caller in enumerate(callers) if caller.returncode == 0
+    ]
+    assert len(successes) == (2 if matching else 1), database.redact(str(outputs))
+    winner = successes[0]
+    digest = database.credential_digest(role)
+    assert (
+        database.sql("SELECT 1", role, password=passwords[winner]).stdout.strip() == "1"
+    )
+    for index, password in enumerate(passwords):
+        result = database.sql("SELECT 1", role, check=False, password=password)
+        assert (result.returncode == 0) == (matching or index == winner)
+    retry_index = 1 - winner
+    retry = database.start_call("initializer-retry", service, file=files[retry_index])
+    stdout, stderr = retry.communicate(timeout=60)
+    assert all(password not in stdout + stderr for password in passwords), (
+        "plaintext credential leaked"
+    )
+    assert (retry.returncode == 0) == matching
+    assert database.credential_digest(role) == digest
+    assert (
+        database.sql("SELECT 1", role, password=passwords[winner]).stdout.strip() == "1"
+    )
+    for file in files:
+        assert all(password not in file.read_text() for password in passwords)
+
+
+def test_credential_lock_timeout_and_recovery(database: DatabaseStack) -> None:
+    digest = database.credential_digest("mimir_api")
+    password = database.passwords["mimir_api"].read_text().strip()
+    with credential_lock(database):
+        caller = database.start_helper("mimir_api", "timeout-probe")
+        stdout, stderr = caller.communicate(
+            password + "\n" + password + "\n", timeout=45
+        )
+        assert caller.returncode != 0
+        assert "lock timeout" in stderr
+        assert password not in stdout + stderr
+        assert database.credential_digest("mimir_api") == digest
+    database.compose("run", "--rm", "--no-deps", "-T", "role-credentials")
+    assert database.credential_digest("mimir_api") == digest
+
+
+def test_missing_credential_role_aborts_and_releases_lock(
+    database: DatabaseStack,
+) -> None:
+    password = secrets.token_urlsafe(48)
+    caller = database.start_helper("mimir_t03_absent", "missing-role-probe")
+    stdout, stderr = caller.communicate(password + "\n" + password + "\n", timeout=20)
+    assert caller.returncode != 0
+    assert "no rows returned" in stderr
+    assert password not in stdout + stderr
+    database.compose("run", "--rm", "--no-deps", "-T", "role-credentials")
+
+
+def test_interrupted_credential_transaction_rolls_back(database: DatabaseStack) -> None:
+    # A disposable role, not a domain migration or normal application privilege.
+    role = "mimir_t03_interrupted"
+    database.sql(f"CREATE ROLE {role} LOGIN; GRANT CONNECT ON DATABASE mimir TO {role}")
+    password = secrets.token_urlsafe(48)
+    caller = database.start_helper(role, "interrupted-probe")
+    try:
+        # Withhold prompt input: the real helper has acquired its lock and checked NULL.
+        database.wait_for_credential_lock(["interrupted-probe"], granted=True)
+        database.sql(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name='interrupted-probe'",
+            database="postgres",
+        )
+        stdout, stderr = caller.communicate(
+            password + "\n" + password + "\n", timeout=20
+        )
+        assert caller.returncode != 0
+        assert password not in stdout + stderr
+        assert (
+            database.sql(
+                f"SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='{role}'",
+                database="postgres",
+            ).stdout.strip()
+            == "t"
+        )
+        retry = database.start_helper(role, "interrupted-retry")
+        stdout, stderr = retry.communicate(
+            password + "\n" + password + "\n", timeout=20
+        )
+        assert password not in stdout + stderr
+        assert retry.returncode == 0, database.redact(stderr)
+        assert database.sql("SELECT 1", role, password=password).stdout.strip() == "1"
+    finally:
+        database.sql(f"REVOKE CONNECT ON DATABASE mimir FROM {role}; DROP ROLE {role}")

@@ -23,13 +23,11 @@ provision_password() {
     role=$1
     read_secret "${role}_password"
     role_password=$value
-    missing=$(psql -XAtq -v ON_ERROR_STOP=1 -c "SELECT rolpassword IS NULL FROM pg_authid WHERE rolname = '$role'")
-    case "$missing" in
-        t) printf '%s\n%s\n' "$role_password" "$role_password" |
-            psql -Xq -v ON_ERROR_STOP=1 -c "\\password $role" ;;
-        f) ;;
-        *) echo 'Required database role is missing' >&2; exit 1 ;;
-    esac
+    # Commands come from a file; stdin contains only the two password prompts.
+    # The helper holds one database transaction across the check and assignment.
+    printf '%s\n%s\n' "$role_password" "$role_password" |
+        psql -Xq -v ON_ERROR_STOP=1 -v role="$role" \
+            -f /mimir/database/provision-password.psql
     # Actual password login also rejects a changed secret with retained volumes.
     PGPASSWORD=$role_password psql -XAtq -v ON_ERROR_STOP=1 -U "$role" -d mimir -c 'SELECT 1' >/dev/null
     unset role_password value
