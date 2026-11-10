@@ -15,6 +15,21 @@ Examples to seed the matrix (not test-pass claims): auth/session renewal → T24
 
 ## Complete acceptance ownership seed (not test execution evidence)
 
+T04 supporting identity/session database coverage →
+`tests/integration/test_database.py` (the `test_t04_*` cases), using real
+PostgreSQL 18/Flyway. This covers V002 fresh/repeat/restart, V001-to-V002 upgrade
+and transactional rollback/recovery, checksum drift, owner integrity, exact
+case-sensitive logins, restricted pre-authentication lookups, actual runtime
+privileges/RLS and transaction-context clearing, session storage/lifetime guards
+and competing uniqueness/renewal updates. It supplies the T04 subset of DB-01,
+DB-02 and supporting DB-ROLE-01/DB-MIG-01 database evidence. SEC-01,
+API-SESSION-01 and AUTH-RENEW-01 receive storage-level support only; password
+verification, provisioning/session services, HTTP authentication/renewal and
+full V001–V005 acceptance remain unimplemented by this task. Normative acceptance
+ownership/status are unchanged. The owner's approved context is recorded in
+`backend/milestones/T04_auth-schema.md`; exact results and reviewed SHA belong
+to the T04 PR, not this mapping.
+
 T03 supporting role/schema coverage → `backend/tests/test_migrations.py` and
 `tests/integration/test_database.py`; deterministic policy failures and real
 PostgreSQL 18/Flyway integration. The suite covers V001, runtime privilege denial,
