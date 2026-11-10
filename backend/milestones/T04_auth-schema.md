@@ -4,8 +4,9 @@
 **Branch:** `feature/t04-auth-schema` (from updated `main`)  
 **Dependencies:** T03  
 **Status:** V002 implementation candidate and executable PostgreSQL tests included
-on the T04 feature branch; independent review and human merge approval pending.
+on the T04 feature branch; independent review and human merge approval is complete.
 Actual validation commands/results and the submitted SHA belong to the task PR.
+The PR has also been completed and approved.
 
 ## Objective / authorized scope
 User, auth identity/session tables, constraints, Argon2 storage contract and
