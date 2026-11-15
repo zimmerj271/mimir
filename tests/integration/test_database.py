@@ -1501,14 +1501,15 @@ class ArchiveRows:
         role="user",
         text="'synthetic content'",
         revision_number=1,
+        status_sql="DEFAULT",
     ):
         message = message or str(uuid.uuid7())
         revision = revision or str(uuid.uuid7())
         pointer = f"'{revision}'" if pointer_first else "NULL"
         return f"""
             INSERT INTO archive.messages(message_id,user_id,conversation_id,ordinal,
-                role,current_revision_id) VALUES ('{message}','{self.user}',
-                    '{self.conversation}',{ordinal},'{role}',{pointer});
+                role,status,current_revision_id) VALUES ('{message}','{self.user}',
+                    '{self.conversation}',{ordinal},'{role}',{status_sql},{pointer});
             INSERT INTO archive.message_revisions(revision_id,user_id,message_id,
                 revision_number,content_text) VALUES ('{revision}','{self.user}',
                     '{message}',{revision_number},{text});
@@ -1730,13 +1731,38 @@ def test_t05_commit_guard_survives_actor_context_changes(archive_rows, context):
 )
 def test_t05_unsupported_message_states_rejected(archive_rows, status):
     rows = archive_rows
+    message = str(uuid.uuid7())
+    revision = str(uuid.uuid7())
     value = status if status == "NULL" else f"'{status}'"
-    sql = (
-        rows.incomplete_sql()
-        .replace("ordinal,role)", "ordinal,role,status)")
-        .replace("2,'user')", f"2,'user',{value})")
+    # The pair is otherwise valid: removing the status CHECK must let the four
+    # non-null invalid states commit, making this regression test fail.
+    failed = rows.actor(
+        rows.message_sql(message=message, revision=revision, status_sql=value),
+        check=False,
     )
-    assert rows.actor(sql, check=False).returncode != 0
+    assert failed.returncode != 0
+    if status == "NULL":
+        expected = 'null value in column "status" of relation "messages" violates not-null constraint'
+    else:
+        expected = 'violates check constraint "messages_status_check"'
+    assert expected in failed.stderr
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.messages WHERE message_id='{message}'"
+        ).stdout.strip()
+        == "0"
+    )
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.message_revisions WHERE revision_id='{revision}'"
+        ).stdout.strip()
+        == "0"
+    )
+    # Reusing the exact identities/ordinal with completed status is a positive
+    # control and confirms the rejected transaction left no conflicting rows.
+    rows.actor(
+        rows.message_sql(message=message, revision=revision, status_sql="'completed'")
+    )
 
 
 @pytest.mark.parametrize("foreign_owner", (False, True))
