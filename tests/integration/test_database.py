@@ -301,6 +301,39 @@ def database(tmp_path_factory):
         stack.cleanup()
 
 
+@pytest.mark.parametrize("service", ("role-bootstrap", "flyway", "role-credentials"))
+def test_optional_jobs_attach_only_to_compose_private_network(
+    database: DatabaseStack, service: str
+) -> None:
+    # A test-only stdin barrier keeps each actual image/configuration available
+    # for inspection. Normal entrypoints are exercised by the migration tests.
+    tag = f"network-{service}"
+    name = f"{database.project}-{tag}"
+    process = database.start_call(
+        tag, "--entrypoint", "/bin/sh", service, "-c", "cat >/dev/null"
+    )
+    try:
+        deadline = time.monotonic() + 15
+        while True:
+            result = database.docker("inspect", name, check=False)
+            if result.returncode == 0:
+                info = json.loads(result.stdout)[0]
+                if info["State"]["Running"]:
+                    break
+            assert time.monotonic() < deadline, "optional network probe did not start"
+            time.sleep(0.05)
+        model = json.loads(database.file.read_text())
+        private = model["networks"]["private"]["name"]
+        assert info["Config"]["Labels"]["mimir.t03_test"] == database.token
+        assert info["HostConfig"]["NetworkMode"] == private
+        assert not info["HostConfig"].get("ExtraHosts")
+        assert set(info["NetworkSettings"]["Networks"]) == {private}
+        assert not any(info["NetworkSettings"]["Ports"].values())
+    finally:
+        stdout, stderr = process.communicate(input="", timeout=15)
+        assert process.returncode == 0, database.redact(stdout + stderr)
+
+
 def test_fresh_repeat_validate_and_restart(database: DatabaseStack) -> None:
     assert database.sql("SHOW server_version_num").stdout.startswith("18")
     before = database.sql(

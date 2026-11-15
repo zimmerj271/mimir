@@ -1,6 +1,7 @@
 """DEPLOY-01 policy failure paths; the actual Compose model is checked in Docker CI."""
 
 import copy
+import subprocess
 import sys
 from pathlib import Path
 
@@ -124,14 +125,37 @@ def test_reject_unsafe_secret_files(config: dict, fault: str, tmp_path: Path) ->
         ComposePolicy().validate_secret_file(config)
 
 
-def test_host_mode_requires_actual_bridge_gateway(config: dict) -> None:
-    del config["services"]["ollama"]
-    del config["volumes"]["ollama_data"]
-    backend = config["services"]["backend"]
-    backend["extra_hosts"] = ["ollama=172.23.0.1"]
-    ComposePolicy().validate(config, "172.23.0.1")
+@pytest.mark.parametrize("service", ("backend", "postgres", "qdrant", "ollama"))
+@pytest.mark.parametrize(
+    "override", ({"network_mode": "host"}, {"extra_hosts": {"ollama": "host-gateway"}})
+)
+def test_all_services_reject_host_network_and_endpoint_overrides(
+    config: dict, service: str, override: dict
+) -> None:
+    config["services"][service].update(override)
+    with pytest.raises(PolicyError, match="networking|Compose service DNS"):
+        ComposePolicy().validate(config)
+
+
+@pytest.mark.parametrize("missing", ("service", "volume"))
+def test_compose_ollama_and_its_persistent_volume_are_required(
+    config: dict, missing: str
+) -> None:
+    if missing == "service":
+        del config["services"]["ollama"]
+    else:
+        del config["volumes"]["ollama_data"]
     with pytest.raises(PolicyError):
-        ComposePolicy().validate(config, "172.24.0.1")
-    backend["extra_hosts"] = ["ollama=127.0.0.1"]
-    with pytest.raises(PolicyError):
-        ComposePolicy().validate(config, "127.0.0.1")
+        ComposePolicy().validate(config)
+
+
+def test_retired_host_option_fails_before_docker_access() -> None:
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "deployment/validate_compose.py"), "--host-ollama"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert result.returncode == 2
+    assert "unrecognized arguments: --host-ollama" in result.stderr

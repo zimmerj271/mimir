@@ -8,7 +8,7 @@ CLI application or deployment is implemented by S00.
 **Design artifact only.** This package is not executable software, does not claim SQL migrations or integration tests have run, and requires the specified independent agent and human PR review at **every** task boundary.
 
 ## Product scope
-Mimir is a private local-first LLM and managed-memory assistant. V1 runs on **one Linux/macOS host**. The native Go CLI/TUI and Python backend are independently buildable **within one monorepo**. The backend is Compose-deployed with PostgreSQL 18, Qdrant, Flyway and Ollama (container by default; separately selected local host Ollama supported); Mem0 is a Python memory-provider integration. The API is host loopback only; no LAN clients, TLS reverse proxy, cloud features or multi-host topology in v1.
+Mimir is a private local-first LLM and managed-memory assistant. V1 runs on **one Linux/macOS host**. The native Go CLI/TUI and Python backend are independently buildable **within one monorepo**. The backend is Compose-deployed with PostgreSQL 18, Qdrant, Flyway and Ollama; all services and optional jobs use Compose networks and service DNS. Mem0 is a Python memory-provider integration. The API is host loopback only; no LAN clients, TLS reverse proxy, cloud features or multi-host topology in v1. The [owner-approved networking correction](docs/decisions/COMPOSE_NETWORKING_CORRECTION.md) retires the previous host-installed Ollama alternative.
 
 ## Start here
 1. `AGENTS.md` — binding coding-agent authority and PR stops.

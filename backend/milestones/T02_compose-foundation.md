@@ -11,6 +11,32 @@ infrastructure persistence/isolation coverage only, with application checks defe
 ## Objective / authorized scope
 Define backend, PostgreSQL, Qdrant, Ollama integration endpoint, persistent volumes and isolation.
 
+## Owner-approved networking correction assignment
+
+After T02 merged, the owner explicitly approved a separate deployment correction
+following diagnosis during T05. Work from updated `main` at
+`105d4747299ab317c0d5dda5469d892bcdbc66e2` on
+`feature/t02-compose-networking-correction`; leave staged T05 work in its original
+checkout. T01 and the original T02 prerequisites are merged. The original PR #3
+and its passing CI remain historical evidence, not a claim about this correction.
+
+All container services and optional jobs must use Compose networks and service
+DNS. Retire the native host-installed Ollama overlay, gateway aliases/flags and
+the host-network container used by its smoke test. Reuse Compose-managed Ollama
+and its retained volume. The three optional migration jobs already use the
+private network and must continue to do so. Only backend joins the API bridge;
+data/model ports remain unpublished and host API publishing remains loopback-only.
+
+Reconcile the decision ledger, root README, backend architecture/operations,
+deployment instructions and acceptance traceability. Record the root cause,
+previous CI outcome and explicit owner-approved architecture change in
+`docs/decisions/COMPOSE_NETWORKING_CORRECTION.md`. Preserve historical test evidence.
+Cover supported Compose profiles, real service DNS and every service/job's rejection
+of host-network/host-address overrides, retaining persistence/credential/isolation
+tests. No host-firewall changes, application/schema/contract work, new dependencies
+or future inference features are included. Run quality, deployment and database
+regression gates; open one correction PR and stop for independent and human review.
+
 ## Out of scope
 Do not implement successor tasks, change shared contracts or introduce major dependencies without approval. No public per-memory CRUD, application-owned canonical memory tables, hidden direct client database/provider access, or future-web implementation.
 

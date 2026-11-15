@@ -1,7 +1,6 @@
 """Validate compiled Compose topology without printing configuration or secrets."""
 
 import argparse
-import ipaddress
 import json
 import os
 import re
@@ -38,13 +37,11 @@ def sequence(value: object) -> list[object]:
 class ComposePolicy:
     """Local topology, credential separation and data-volume boundaries."""
 
-    def validate(self, document: object, host_gateway: str | None = None) -> None:
+    def validate(self, document: object) -> None:
         config = mapping(document)
         services = mapping(config.get("services"))
-        expected = {"backend", "postgres", "qdrant"}
-        if host_gateway is None:
-            expected.add("ollama")
-        require(set(services) == expected, "unexpected/missing services or Ollama mode")
+        expected = {"backend", "postgres", "qdrant", "ollama"}
+        require(set(services) == expected, "unexpected/missing Compose services")
         networks = mapping(config.get("networks"))
         require(set(networks) == {"private", "api"}, "unexpected deployment networks")
         require(
@@ -64,11 +61,7 @@ class ComposePolicy:
             "API bridge default host binding must be loopback",
         )
         volumes = mapping(config.get("volumes"))
-        roles = (
-            {"postgres", "qdrant", "ollama"}
-            if host_gateway is None
-            else {"postgres", "qdrant"}
-        )
+        roles = {"postgres", "qdrant", "ollama"}
         require(
             set(volumes) == {f"{role}_data" for role in roles},
             "persistent volumes differ",
@@ -103,6 +96,10 @@ class ComposePolicy:
                 f"{name}: host/privileged networking is forbidden",
             )
             require(
+                not service.get("extra_hosts"),
+                f"{name}: endpoint aliases must use Compose service DNS",
+            )
+            require(
                 not service.get("pid") and not service.get("devices"),
                 f"{name}: host process/device access is forbidden",
             )
@@ -117,7 +114,7 @@ class ComposePolicy:
                     f"{name}: service image must be digest-pinned",
                 )
             else:
-                self._backend(service, host_gateway)
+                self._backend(service)
 
         postgres = mapping(services["postgres"])
         require(
@@ -231,7 +228,7 @@ class ComposePolicy:
                         f"{name}: unexpected data mount",
                     )
 
-    def _backend(self, service: dict[str, object], host_gateway: str | None) -> None:
+    def _backend(self, service: dict[str, object]) -> None:
         require(
             mapping(service.get("sysctls")) == {"net.ipv4.ip_forward": "0"},
             "backend must not route between the API and private networks",
@@ -264,26 +261,6 @@ class ComposePolicy:
             and port.get("protocol") == "tcp",
             "backend must publish IPv4 loopback only",
         )
-        if host_gateway is None:
-            require(
-                not service.get("extra_hosts"), "default mode must use container Ollama"
-            )
-        else:
-            address = ipaddress.ip_address(host_gateway)
-            require(
-                address.version == 4
-                and address.is_private
-                and not address.is_loopback
-                and not address.is_link_local
-                and not address.is_unspecified,
-                "host Ollama must use the private bridge gateway",
-            )
-            hosts = service.get("extra_hosts")
-            require(
-                hosts == {"ollama": host_gateway}
-                or hosts == [f"ollama={host_gateway}"],
-                "host Ollama address differs from the actual Docker bridge gateway",
-            )
 
     def validate_secret_file(self, document: object) -> None:
         for raw in mapping(mapping(document)["secrets"]).values():
@@ -307,33 +284,16 @@ class ComposePolicy:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--host-ollama", action="store_true")
-    args = parser.parse_args()
+    parser.parse_args()
     command = ["docker", "compose", "-f", str(ROOT / "deployment/compose.yaml")]
-    if args.host_ollama:
-        command.extend(["-f", str(ROOT / "deployment/compose.host-ollama.yaml")])
     command.extend(["--profile", "backend", "config", "--format", "json"])
     try:
         result = subprocess.run(
             command, capture_output=True, text=True, check=True, timeout=30
         )
         config: object = json.loads(result.stdout)
-        gateway = None
-        if args.host_ollama:
-            network = mapping(mapping(mapping(config)["networks"])["private"])["name"]
-            result = subprocess.run(
-                ["docker", "network", "inspect", str(network)],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=30,
-            )
-            inspected = mapping(sequence(json.loads(result.stdout))[0])
-            gateway = str(
-                mapping(sequence(mapping(inspected["IPAM"])["Config"])[0])["Gateway"]
-            )
         policy = ComposePolicy()
-        policy.validate(config, gateway)
+        policy.validate(config)
         policy.validate_secret_file(config)
     except (
         PolicyError,
