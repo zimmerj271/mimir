@@ -4,6 +4,8 @@ Transitions are atomic, owner-scoped and guarded with expected state/version/lea
 
 | Entity | From | Allowed next | Rule |
 |---|---|---|---|
+| canonical message | absent | completed | Authoritative content and selected immutable revision must exist at commit; user creation commits with pending run, assistant creation only with successful run finalization and eligible ingestion job |
+| canonical message | completed | none | Identity/owner/conversation/role/ordinal and selected revision immutable; governed conversation deletion/account purge remain permitted |
 | run | pending | running, cancelled, interrupted, failed | Cancellation before worker claim wins; restart may interrupt pending only on unrecoverable state |
 | run | running | completed, failed, cancelled, interrupted | Exactly one terminal commit; terminal state and canonical output revision committed in one transaction |
 | run | completed/failed/cancelled/interrupted | none | Immutable terminal state; cancellation returns terminal unchanged |
@@ -24,3 +26,15 @@ Transitions are atomic, owner-scoped and guarded with expected state/version/lea
 | recovery operation | terminal_confirmed | none | eligible for client journal pruning after configured retention |
 
 **Run cancel race:** cancellation is a request, not a terminal outcome; whichever transaction commits canonical terminal state first wins. On `completed`, final assistant revision must exist; on all other terminal states, do not fabricate a successful revision. Interrupted work may be resumed only through explicit new operation/approved backend recovery algorithm; no hidden duplicate inference.
+
+**Owner-approved T05 clarification:** canonical messages have no persisted pending,
+failed, cancelled or interrupted state. A missing selected revision is permitted
+only within an uncommitted transaction. Failed/cancelled/interrupted runs create
+no canonical assistant message; execution state and provisional output remain in
+runtime checkpoints/streams. Consecutive user messages are valid. Editing and
+regeneration create new conversations; revisions and selected pointers are never
+rewritten. Only successfully committed user/assistant revision pairs are eligible
+for memory ingestion. T05 verifies archive-local constraints only; T12/T16 own
+cross-domain atomicity. Unsuccessful checkpoint retention and explicit retry
+behavior are unresolved by this clarification. The draft shared `Message.status`
+enumeration requires separately authorized reconciliation; it is not changed here.

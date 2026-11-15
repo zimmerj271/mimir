@@ -1,7 +1,7 @@
-"""T03/T04 real PostgreSQL 18/Flyway tests, never skipped for a missing daemon.
+"""T03/T04/T05 real PostgreSQL 18/Flyway tests, never skip a missing daemon.
 
 All fixtures use unique labelled disposable volumes. T03 fixtures stop at V001;
-T04 exercises the real V002 on fresh and upgrade paths.
+T04/T05 exercise real V002/V003 on fresh and upgrade paths.
 """
 
 import concurrent.futures
@@ -1459,4 +1459,648 @@ def test_t04_concurrent_login_uniqueness_and_session_updates(auth_rows):
             f"WHERE token_hash=decode('{rows.hash}','hex')"
         ).stdout.strip()
         == "1|t"
+    )
+
+
+# T05 archive-local SQL guarantees. No runtime, branch, submission or HTTP code.
+V003 = "V003__projects_conversations_and_messages.sql"
+ARCHIVE_TABLES = ("projects", "conversations", "messages", "message_revisions")
+
+
+class ArchiveRows:
+    """Synthetic owners/content; actors here model already-authenticated code."""
+
+    def __init__(self, database):
+        self.database = database
+        self.user = str(uuid.uuid7())
+        self.project = str(uuid.uuid7())
+        self.conversation = str(uuid.uuid7())
+        self.message = str(uuid.uuid7())
+        self.revision = str(uuid.uuid7())
+
+    def actor(self, sql, role="api", check=True):
+        return self.database.sql(
+            f"BEGIN; SET LOCAL app.current_user_id='{self.user}'; {sql}; COMMIT;",
+            f"mimir_{role}",
+            check=check,
+        )
+
+    def owner(self, sql, check=True):
+        return self.database.sql(
+            f"BEGIN; SET LOCAL ROLE mimir_owner; "
+            f"SET LOCAL app.current_user_id='{self.user}'; {sql}; COMMIT;",
+            check=check,
+        )
+
+    def message_sql(
+        self,
+        ordinal=2,
+        message=None,
+        revision=None,
+        pointer_first=False,
+        role="user",
+        text="'synthetic content'",
+        revision_number=1,
+    ):
+        message = message or str(uuid.uuid7())
+        revision = revision or str(uuid.uuid7())
+        pointer = f"'{revision}'" if pointer_first else "NULL"
+        return f"""
+            INSERT INTO archive.messages(message_id,user_id,conversation_id,ordinal,
+                role,current_revision_id) VALUES ('{message}','{self.user}',
+                    '{self.conversation}',{ordinal},'{role}',{pointer});
+            INSERT INTO archive.message_revisions(revision_id,user_id,message_id,
+                revision_number,content_text) VALUES ('{revision}','{self.user}',
+                    '{message}',{revision_number},{text});
+            UPDATE archive.messages SET current_revision_id='{revision}'
+                WHERE message_id='{message}'
+        """
+
+    def seed(self):
+        self.owner(
+            f"INSERT INTO archive.users(user_id,status) VALUES ('{self.user}','active')"
+        )
+        self.actor(f"""
+            INSERT INTO archive.projects(project_id,user_id,name,instructions)
+                VALUES ('{self.project}','{self.user}','synthetic project','synthetic instructions');
+            INSERT INTO archive.conversations(conversation_id,user_id,project_id,title)
+                VALUES ('{self.conversation}','{self.user}','{self.project}','synthetic conversation');
+            {self.message_sql(1, self.message, self.revision)}
+        """)
+
+    def incomplete_sql(self, message=None):
+        return f"""
+            INSERT INTO archive.messages(message_id,user_id,conversation_id,ordinal,role)
+                VALUES ('{message or uuid.uuid7()}','{self.user}','{self.conversation}',2,'user')
+        """
+
+
+@pytest.fixture(scope="module")
+def archive_database(tmp_path_factory):
+    stack = DatabaseStack(
+        tmp_path_factory.mktemp("archive-database"), through_version=3
+    )
+    try:
+        stack.start()
+        stack.migrate()
+        yield stack
+    finally:
+        stack.cleanup()
+
+
+@pytest.fixture
+def archive_rows(archive_database):
+    rows = ArchiveRows(archive_database)
+    rows.seed()
+    return rows
+
+
+def test_t05_fresh_repeat_validate_restart_and_catalog(archive_rows):
+    rows = archive_rows
+    database = rows.database
+    assert database.sql("SHOW server_version_num").stdout.startswith("18")
+    query = "SELECT version,checksum,success FROM public.flyway_schema_history ORDER BY installed_rank"
+    history = database.sql(query).stdout
+    assert [line.split("|")[0] for line in history.splitlines()] == [
+        "001",
+        "002",
+        "003",
+    ]
+    database.migrate()
+    database.flyway("validate")
+    database.compose("restart", "postgres")
+    database.compose("up", "-d", "--wait", "postgres")
+    database.flyway("validate")
+    assert database.sql(query).stdout == history
+    assert (
+        rows.actor(
+            f"SELECT current_revision_id FROM archive.messages WHERE message_id='{rows.message}'"
+        ).stdout.strip()
+        == rows.revision
+    )
+    assert database.sql("""
+        SELECT c.relname,pg_get_userbyid(c.relowner),c.relrowsecurity,c.relforcerowsecurity
+        FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='archive' AND c.relname IN
+            ('projects','conversations','messages','message_revisions') ORDER BY c.relname
+    """).stdout.splitlines() == [
+        f"{table}|mimir_owner|t|t" for table in sorted(ARCHIVE_TABLES)
+    ]
+    assert (
+        database.sql("""
+        SELECT conname,condeferrable,condeferred FROM pg_constraint
+        WHERE conname='message_current_revision_fk'
+    """).stdout.strip()
+        == "message_current_revision_fk|t|t"
+    )
+    assert (
+        database.sql("""
+        SELECT tgdeferrable,tginitdeferred FROM pg_trigger
+        WHERE tgname='message_revision_required'
+    """).stdout.strip()
+        == "t|t"
+    )
+    assert (
+        database.sql("""
+        SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='archive' AND (pg_get_userbyid(p.proowner)<>'mimir_owner' OR
+            EXISTS (SELECT FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+            WHERE a.grantee=0 AND a.privilege_type='EXECUTE'))
+    """).stdout.strip()
+        == "0"
+    )
+
+
+def test_t05_upgrade_failure_rollback_recovery_and_drift(tmp_path):
+    database = DatabaseStack(tmp_path, through_version=2)
+    try:
+        database.start()
+        database.migrate()
+        rows = AuthRows(database)
+        rows.seed()
+        history = database.sql(
+            "SELECT version,checksum FROM public.flyway_schema_history ORDER BY installed_rank"
+        ).stdout
+        candidate = database.migrations / V003
+        original = (ROOT / "backend/migrations" / V003).read_bytes()
+        candidate.write_bytes(original + b"\nSELECT 1/0;\n")
+        assert database.flyway("migrate", check=False).returncode != 0
+        assert (
+            database.sql(
+                "SELECT count(*) FROM public.flyway_schema_history WHERE version='003'"
+            ).stdout.strip()
+            == "0"
+        )
+        for table in ARCHIVE_TABLES:
+            assert (
+                database.sql(
+                    f"SELECT to_regclass('archive.{table}') IS NULL"
+                ).stdout.strip()
+                == "t"
+            )
+        assert (
+            database.sql(
+                "SELECT to_regprocedure('archive.require_message_revision()') IS NULL"
+            ).stdout.strip()
+            == "t"
+        )
+        assert (
+            database.sql(
+                "SELECT version,checksum FROM public.flyway_schema_history ORDER BY installed_rank"
+            ).stdout
+            == history
+        )
+        candidate.write_bytes(original)
+        database.flyway("migrate")
+        database.flyway("validate")
+        assert (
+            database.sql(
+                f"SELECT count(*) FROM archive.users WHERE user_id='{rows.user}'"
+            ).stdout.strip()
+            == "1"
+        )
+        assert (
+            database.sql(
+                "SELECT version,checksum FROM public.flyway_schema_history WHERE version<>'003' ORDER BY installed_rank"
+            ).stdout
+            == history
+        )
+        archive = ArchiveRows(database)
+        archive.seed()
+        try:
+            candidate.write_bytes(original + b"\nSELECT 12345;\n")
+            failed = database.flyway("validate", check=False)
+            assert (
+                failed.returncode != 0
+                and "checksum" in (failed.stdout + failed.stderr).lower()
+            )
+            assert database.flyway("migrate", check=False).returncode != 0
+        finally:
+            candidate.write_bytes(original)
+        database.flyway("validate")
+    finally:
+        database.cleanup()
+
+
+@pytest.mark.parametrize("role", ("api", "worker"))
+@pytest.mark.parametrize("pointer_first", (False, True))
+def test_t05_atomic_creation_and_consecutive_user_messages(
+    archive_rows, role, pointer_first
+):
+    rows = archive_rows
+    rows.actor(rows.message_sql(pointer_first=pointer_first), role)
+    assert rows.actor(
+        f"""
+        SELECT m.ordinal,m.role,m.status,r.revision_number,r.content_text,
+            r.content_hash=sha256(convert_to(r.content_text,'UTF8'))
+        FROM archive.messages m JOIN archive.message_revisions r
+            ON (r.user_id,r.message_id,r.revision_id)=(m.user_id,m.message_id,m.current_revision_id)
+        WHERE m.conversation_id='{rows.conversation}' ORDER BY m.ordinal
+    """,
+        role,
+    ).stdout.splitlines() == [
+        f"{ordinal}|user|completed|1|synthetic content|t" for ordinal in (1, 2)
+    ]
+
+
+@pytest.mark.parametrize(
+    "context",
+    (
+        "",
+        "SET LOCAL app.current_user_id='';",
+        f"SET LOCAL app.current_user_id='{uuid.uuid7()}';",
+    ),
+)
+def test_t05_commit_guard_survives_actor_context_changes(archive_rows, context):
+    rows = archive_rows
+    message = str(uuid.uuid7())
+    failed = rows.actor(rows.incomplete_sql(message) + ";" + context, check=False)
+    assert failed.returncode != 0 and "selected revision at commit" in failed.stderr
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.messages WHERE message_id='{message}'"
+        ).stdout.strip()
+        == "0"
+    )
+    rows.actor(rows.message_sql(message=message))
+
+
+@pytest.mark.parametrize(
+    "status", ("pending", "failed", "cancelled", "interrupted", "NULL")
+)
+def test_t05_unsupported_message_states_rejected(archive_rows, status):
+    rows = archive_rows
+    value = status if status == "NULL" else f"'{status}'"
+    sql = (
+        rows.incomplete_sql()
+        .replace("ordinal,role)", "ordinal,role,status)")
+        .replace("2,'user')", f"2,'user',{value})")
+    )
+    assert rows.actor(sql, check=False).returncode != 0
+
+
+@pytest.mark.parametrize("foreign_owner", (False, True))
+def test_t05_selected_revision_must_match_message_and_owner(
+    archive_rows, foreign_owner
+):
+    rows = archive_rows
+    target = ArchiveRows(rows.database) if foreign_owner else rows
+    if foreign_owner:
+        target.seed()
+    failed = rows.actor(
+        rows.incomplete_sql()
+        .replace("ordinal,role)", "ordinal,role,current_revision_id)")
+        .replace("2,'user')", f"2,'user','{target.revision}')"),
+        check=False,
+    )
+    assert failed.returncode != 0 and "message_current_revision_fk" in failed.stderr
+
+
+@pytest.mark.parametrize(
+    "assignment",
+    (
+        "current_revision_id=NULL",
+        "current_revision_id='{replacement}'",
+        "message_id='{replacement}'",
+        "user_id='{replacement}'",
+        "conversation_id='{replacement}'",
+        "role='assistant'",
+        "ordinal=2",
+        "created_at=created_at+interval '1 second'",
+    ),
+)
+def test_t05_committed_message_fields_are_immutable_even_for_owner(
+    archive_rows, assignment
+):
+    rows = archive_rows
+    assignment = assignment.format(replacement=uuid.uuid7())
+    failed = rows.owner(
+        f"UPDATE archive.messages SET {assignment} WHERE message_id='{rows.message}'",
+        check=False,
+    )
+    assert failed.returncode != 0 and "immutable" in failed.stderr
+
+
+def test_t05_pointer_cannot_switch_to_another_valid_revision(archive_rows):
+    rows = archive_rows
+    revision = str(uuid.uuid7())
+    sql = f"""
+        INSERT INTO archive.message_revisions(revision_id,user_id,message_id,revision_number,content_text)
+            VALUES ('{revision}','{rows.user}','{rows.message}',2,'synthetic alternative');
+        UPDATE archive.messages SET current_revision_id='{revision}' WHERE message_id='{rows.message}'
+    """
+    failed = rows.actor(sql, check=False)
+    assert failed.returncode != 0 and "immutable" in failed.stderr
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.message_revisions WHERE message_id='{rows.message}'"
+        ).stdout.strip()
+        == "1"
+    )
+
+
+@pytest.mark.parametrize(
+    "assignment",
+    (
+        "content_text='changed'",
+        "content_format='text/v1'",
+        "revision_number=2",
+        "message_id='{replacement}'",
+        "user_id='{replacement}'",
+        "revision_id='{replacement}'",
+        "created_at=created_at+interval '1 second'",
+    ),
+)
+def test_t05_revision_updates_rejected_even_for_owner(archive_rows, assignment):
+    rows = archive_rows
+    assignment = assignment.format(replacement=uuid.uuid7())
+    failed = rows.owner(
+        f"UPDATE archive.message_revisions SET {assignment} WHERE revision_id='{rows.revision}'",
+        check=False,
+    )
+    assert failed.returncode != 0 and "immutable" in failed.stderr
+
+
+@pytest.mark.parametrize("role", ("api", "worker"))
+@pytest.mark.parametrize("end", ("COMMIT", "ROLLBACK"))
+def test_t05_actual_rls_and_reused_connection(archive_rows, role, end):
+    rows = archive_rows
+    other = ArchiveRows(rows.database)
+    other.seed()
+    for table in ARCHIVE_TABLES:
+        result = rows.database.sql(
+            f"""
+            SELECT count(*) FROM archive.{table}; BEGIN;
+            SET LOCAL app.current_user_id='{rows.user}';
+            SELECT count(*) FROM archive.{table};
+            SELECT count(*) FROM archive.{table} WHERE user_id='{other.user}';
+            {end}; SELECT count(*) FROM archive.{table}; BEGIN;
+            SET LOCAL app.current_user_id='{other.user}';
+            SELECT count(*) FROM archive.{table}; COMMIT;
+            SELECT count(*) FROM archive.{table}
+        """,
+            f"mimir_{role}",
+        )
+        assert result.stdout.splitlines() == ["0", "1", "0", "0", "1", "0"]
+        for context, error in (
+            ("SET row_security=off", "row-level security"),
+            ("SET app.current_user_id='invalid'", "uuid"),
+        ):
+            failed = rows.database.sql(
+                f"{context}; SELECT * FROM archive.{table}",
+                f"mimir_{role}",
+                check=False,
+            )
+            assert failed.returncode != 0 and error in failed.stderr
+        failed = rows.actor(
+            f"UPDATE archive.messages SET current_revision_id=NULL WHERE user_id='{other.user}' RETURNING message_id",
+            role,
+        )
+        assert failed.stdout.strip() == ""
+    forged = rows.actor(
+        rows.message_sql().replace(f"'{rows.user}'", f"'{other.user}'"),
+        role,
+        check=False,
+    )
+    assert forged.returncode != 0
+    # Normal logins cannot invoke the owner commit-guard routine directly.
+    assert (
+        rows.database.sql(
+            "SELECT has_function_privilege(current_user,'archive.require_message_revision()','EXECUTE')",
+            f"mimir_{role}",
+        ).stdout.strip()
+        == "f"
+    )
+
+
+def test_t05_cross_owner_relationships_rejected(archive_rows):
+    rows = archive_rows
+    other = ArchiveRows(rows.database)
+    other.seed()
+    for statement in (
+        f"INSERT INTO archive.conversations(conversation_id,user_id,project_id,title) VALUES ('{uuid.uuid7()}','{rows.user}','{other.project}','synthetic')",
+        rows.message_sql().replace(f"'{rows.conversation}'", f"'{other.conversation}'"),
+        f"INSERT INTO archive.message_revisions(revision_id,user_id,message_id,revision_number,content_text) VALUES ('{uuid.uuid7()}','{rows.user}','{other.message}',1,'synthetic')",
+    ):
+        failed = rows.actor(statement, check=False)
+        assert failed.returncode != 0 and (
+            "foreign key" in failed.stderr or "owned" in failed.stderr
+        )
+
+
+@pytest.mark.parametrize("role", RUNTIME)
+def test_t05_least_privilege_and_no_unrestricted_purge(archive_rows, role):
+    rows = archive_rows
+    for table in ARCHIVE_TABLES:
+        for statement in (
+            f"DELETE FROM archive.{table}",
+            f"TRUNCATE archive.{table} CASCADE",
+            f"ALTER TABLE archive.{table} DISABLE ROW LEVEL SECURITY",
+        ):
+            assert rows.actor(statement, role, check=False).returncode != 0
+        if role in ("auth", "maintenance"):
+            assert (
+                rows.actor(
+                    f"SELECT * FROM archive.{table}", role, check=False
+                ).returncode
+                != 0
+            )
+    for statement in (
+        "UPDATE archive.message_revisions SET content_text='changed'",
+        "UPDATE archive.messages SET role='assistant'",
+        "SET ROLE mimir_owner",
+        "SET ROLE mimir_migrator",
+    ):
+        assert rows.actor(statement, role, check=False).returncode != 0
+
+
+@pytest.mark.parametrize("role", ("user", "assistant"))
+def test_t05_utf8_content_limit_and_hash(archive_rows, role):
+    rows = archive_rows
+    rows.actor(rows.message_sql(role=role, text="repeat('é',524288)"))
+    assert (
+        rows.actor(
+            f"SELECT octet_length(content_text),content_hash=sha256(convert_to(content_text,'UTF8')) FROM archive.message_revisions r JOIN archive.messages m USING(user_id,message_id) WHERE m.conversation_id='{rows.conversation}' AND m.ordinal=2"
+        ).stdout.strip()
+        == "1048576|t"
+    )
+    failed = rows.actor(
+        rows.message_sql(ordinal=3, role=role, text="repeat('é',524288)||'x'"),
+        check=False,
+    )
+    assert failed.returncode != 0 and "check constraint" in failed.stderr
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.messages WHERE conversation_id='{rows.conversation}'"
+        ).stdout.strip()
+        == "2"
+    )
+
+
+def test_t05_dense_ordinals_revisions_and_savepoint_rollback(archive_rows):
+    rows = archive_rows
+    for sql in (
+        rows.message_sql(ordinal=0),
+        rows.message_sql(ordinal=3),
+        rows.message_sql(revision_number=2),
+    ):
+        failed = rows.actor(sql, check=False)
+        assert failed.returncode != 0 and "dense" in failed.stderr
+    rows.actor(
+        f"SAVEPOINT candidate; {rows.incomplete_sql()}; ROLLBACK TO candidate; {rows.message_sql()}"
+    )
+    failed = rows.actor(
+        f"""
+        INSERT INTO archive.message_revisions(revision_id,user_id,message_id,revision_number,content_text)
+            VALUES ('{uuid.uuid7()}','{rows.user}','{rows.message}',3,'synthetic')
+    """,
+        check=False,
+    )
+    assert failed.returncode != 0 and "dense" in failed.stderr
+
+
+def test_t05_project_reassignment_archive_and_version_cas(archive_rows):
+    rows = archive_rows
+    failed = rows.actor(
+        f"UPDATE archive.conversations SET project_id=NULL WHERE conversation_id='{rows.conversation}'",
+        check=False,
+    )
+    assert failed.returncode != 0 and "increasing version" in failed.stderr
+    rows.actor(
+        f"UPDATE archive.conversations SET project_id=NULL,status='archived',conversation_version=2 WHERE conversation_id='{rows.conversation}'"
+    )
+    assert (
+        rows.actor(
+            f"SELECT current_revision_id FROM archive.messages WHERE message_id='{rows.message}'"
+        ).stdout.strip()
+        == rows.revision
+    )
+    failed = rows.actor(
+        f"UPDATE archive.conversations SET conversation_version=1 WHERE conversation_id='{rows.conversation}'",
+        check=False,
+    )
+    assert failed.returncode != 0
+    barrier = threading.Barrier(2)
+
+    def change(title):
+        barrier.wait(timeout=15)
+        return rows.actor(
+            f"UPDATE archive.conversations SET title='{title}',conversation_version=3 WHERE conversation_id='{rows.conversation}' AND conversation_version=2 RETURNING conversation_version"
+        )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(change, title) for title in ("synthetic A", "synthetic B")
+        ]
+        assert sorted(future.result().stdout.strip() for future in futures) == ["", "3"]
+
+
+def test_t05_competing_appends_and_revision_numbers(archive_rows):
+    rows = archive_rows
+    barrier = threading.Barrier(2)
+
+    def insert(sql):
+        barrier.wait(timeout=15)
+        return rows.actor(sql, check=False)
+
+    for statements in (
+        [rows.message_sql() for _ in range(2)],
+        [
+            f"INSERT INTO archive.message_revisions(revision_id,user_id,message_id,revision_number,content_text) VALUES ('{uuid.uuid7()}','{rows.user}','{rows.message}',2,'synthetic')"
+            for _ in range(2)
+        ],
+    ):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(insert, sql) for sql in statements]
+            results = [future.result() for future in futures]
+        assert sorted(result.returncode == 0 for result in results) == [False, True]
+        assert all("dense" in result.stderr for result in results if result.returncode)
+    assert (
+        rows.actor(
+            f"SELECT string_agg(ordinal::text,',' ORDER BY ordinal) FROM archive.messages WHERE conversation_id='{rows.conversation}'"
+        ).stdout.strip()
+        == "1,2"
+    )
+
+
+def test_t05_deferred_pair_validation_and_full_transaction_rollback(archive_rows):
+    rows = archive_rows
+    # Neither a missing row behind a non-null pointer nor forcing deferred
+    # constraints early can leave an incomplete canonical message committed.
+    for sql in (
+        rows.incomplete_sql()
+        .replace("ordinal,role)", "ordinal,role,current_revision_id)")
+        .replace("2,'user')", f"2,'user','{uuid.uuid7()}')"),
+        rows.incomplete_sql() + "; SET CONSTRAINTS ALL IMMEDIATE",
+        rows.message_sql() + "; SELECT 1/0",
+    ):
+        assert rows.actor(sql, check=False).returncode != 0
+        assert (
+            rows.actor(
+                f"SELECT count(*) FROM archive.messages WHERE conversation_id='{rows.conversation}'"
+            ).stdout.strip()
+            == "1"
+        )
+        assert (
+            rows.actor("SELECT count(*) FROM archive.message_revisions").stdout.strip()
+            == "1"
+        )
+    rows.actor(rows.message_sql())
+
+
+@pytest.mark.parametrize(
+    "table,key",
+    (
+        ("projects", "project_id"),
+        ("conversations", "conversation_id"),
+    ),
+)
+def test_t05_metadata_identity_ownership_and_status_guards(archive_rows, table, key):
+    rows = archive_rows
+    identity = rows.project if table == "projects" else rows.conversation
+    for assignment in (
+        f"{key}='{uuid.uuid7()}'",
+        f"user_id='{uuid.uuid7()}'",
+        "created_at=created_at-interval '1 day'",
+        "status='invalid'",
+    ):
+        assert (
+            rows.owner(
+                f"UPDATE archive.{table} SET {assignment} WHERE {key}='{identity}'",
+                check=False,
+            ).returncode
+            != 0
+        )
+    if table == "conversations":
+        assert (
+            rows.owner(
+                f"UPDATE archive.conversations SET updated_at=updated_at-interval '1 second' WHERE conversation_id='{identity}'",
+                check=False,
+            ).returncode
+            != 0
+        )
+    else:
+        rows.actor(
+            f"UPDATE archive.projects SET status='archived' WHERE project_id='{identity}'"
+        )
+        assert rows.actor("SELECT count(*) FROM archive.messages").stdout.strip() == "1"
+
+
+def test_t05_governed_deletion_has_no_immutability_update_bypass(archive_rows):
+    rows = archive_rows
+    # Schema-owner deletion is a storage capability for future reviewed purge
+    # routines, not a runtime grant or an implemented T35/T36 lifecycle service.
+    failed = rows.owner(
+        f"DELETE FROM archive.message_revisions WHERE revision_id='{rows.revision}'",
+        check=False,
+    )
+    assert failed.returncode != 0 and "foreign key" in failed.stderr
+    rows.owner(f"""
+        DELETE FROM archive.message_revisions WHERE message_id='{rows.message}';
+        DELETE FROM archive.messages WHERE message_id='{rows.message}'
+    """)
+    assert rows.actor("SELECT count(*) FROM archive.messages").stdout.strip() == "0"
+    assert (
+        rows.actor("SELECT count(*) FROM archive.message_revisions").stdout.strip()
+        == "0"
     )

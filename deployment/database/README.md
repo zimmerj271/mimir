@@ -3,7 +3,11 @@
 Base `main`: `13e60b1f0c17529b53060dc134081a090a72fb20` (merged T02).
 Authority: [T03](../../backend/milestones/T03_flyway-roles.md),
 [approved decisions](../../docs/decisions/FINAL_V1.md),
-[database design](../../backend/DATABASE_DESIGN.md). Only V001 is delivered.
+[database design](../../backend/DATABASE_DESIGN.md). This guide describes the T03
+role/bootstrap foundation. T04 adds V002 identity/session storage and T05 adds
+candidate V003 archive storage; see the current
+[migration and recovery guide](../../backend/migrations/README.md) for their
+object-specific grants, FORCE RLS, lifecycle guards and fresh/upgrade tests.
 
 ## Roles and trust boundary
 
@@ -137,6 +141,8 @@ coordinated restore under T37; never use repair/clean or delete the retained vol
 If provisioning succeeds but migration/credential verification fails, stop and
 resolve the cause; the runner does not expose an application or continue stages.
 
-Full V001–V005 upgrades, production tenant tables/policies, application schema
-readiness, user auth and backup/restore remain later-task acceptance. This is not
-a release-readiness or native-platform runtime claim.
+T04/T05 extend the same database suite with actual tenant tables/policies,
+fresh V001–V003 and real V002/V003 upgrade rollback/recovery, immutable canonical
+history and concurrency coverage. Full V001–V005 acceptance, application schema
+readiness, user authentication services and backup/restore remain later work.
+This is not a release-readiness or native-platform runtime claim.

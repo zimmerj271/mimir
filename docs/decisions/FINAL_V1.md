@@ -14,6 +14,46 @@ These are approved owner decisions from Database Reviews 1–7, API Reviews 1–
 - Accepted operation ledger 30 days, tombstone next 30, unresolved evidence persists. Job FIFO per user with cross-user concurrency; lease 2m heartbeat 30s; retry at most 5, initial 5s capped 5m; uncertain Mem0 write reconciled, never blind replay. Stale run executors fenced. Already-started interrupted inference never regenerated automatically.
 - Conversation subtree deletion HTTP 202, fenced, cancels outstanding source work, retains already-created managed memory; account deletion revokes sessions, fences, purges and verifies provider+archive, with independent journal effective even after backup restore.
 
+### Owner-approved T05 clarification: canonical messages and immutability
+
+Approved explicitly by the owner during the T05 implementation assignment. These
+rules supersede inconsistent message-state wording in earlier design inputs.
+
+- The archive owns authoritative conversational content; runtime exclusively owns
+  inference execution state. Persisted canonical messages have only `completed`
+  status and always select an immutable revision. A message may temporarily lack
+  its revision within an uncommitted transaction, never after commit.
+- A user message and its initial revision commit atomically with the associated
+  pending run. An assistant message is created only on successful conversational
+  inference, atomically with its immutable revision, terminal run state and eligible
+  memory ingestion job. Only successfully committed user/assistant revision pairs
+  are eligible for ingestion. Consecutive user messages are valid; strict role
+  alternation is not an archive invariant.
+- Provisional assistant output belongs in runtime checkpoints and streaming.
+  Failed, cancelled and interrupted runs create no canonical assistant message;
+  their state and available partial output remain runtime concerns. Clients may
+  display these through existing run/checkpoint interfaces. Unsuccessful checkpoint
+  retention and explicit retry behavior remain unresolved and outside T05.
+- Revision records are immutable. After a message commits, its selected revision
+  cannot be replaced or cleared and must belong to the same message and owner.
+  Message identity, owner, conversation membership, role and ordinal are immutable.
+  There are no application or internal operational exceptions. Authorized archive
+  deletion and account purge remain permitted under their own lifecycle policies.
+- Editing and regeneration create new conversations through the approved branch
+  mechanism. Inherited history references exact immutable revisions without copying
+  text. Retain separate message and revision tables despite one selected revision
+  per committed message in v1.
+- T05 enforces archive-local invariants in PostgreSQL. T06 owns branch snapshots;
+  T07 owns runtime schema/checkpoints; T12 owns atomic user-message/run submission;
+  T16 owns successful assistant/run/job finalization. No cross-domain transaction
+  is implemented or claimed verified by T05.
+- Contract reconciliation is required: `Message.status` in
+  `contracts/openapi.yaml` must expose only `completed`. Its existing `pending`,
+  `failed` and `interrupted` alternatives are inconsistent with this approval.
+  T05 records the discrepancy without changing shared contract artifacts or their
+  manifest. Contract modification/validation requires separate authorization through
+  established S01 governance before public producers/consumers implement it.
+
 ## API and execution
 - Backend-owned versioned OpenAPI 3.1, SSE schema, error catalog, fixtures, checksum, `/api/v1`, semver independently of app; `/api/v1/meta` compatible public discovery. Contract-first S01; no absent public details invented by implementation agents. snake_case JSON, UUIDv7 persistent new IDs, UTC RFC3339, typed errors, exact omission/null rules. Canonical `text/v1` message content **max 1 MiB UTF-8 for user AND assistant**; max generation tokens configured per model; no silent truncation. Projects/conversations page 50 max 200; messages page 100 max 500.
 - Username/password login, Argon2id server verifier; opaque random 256-bit bearer session, server SHA-256 token hash; sliding idle 30d, absolute 90d, **no auth refresh endpoint**. Persistent Linux/macOS OS keyring by default; protected-file fallback opt-in 0700/0600, reject unsafe perms/symlinks; logout locally removes secret regardless of remote revocation outcome.

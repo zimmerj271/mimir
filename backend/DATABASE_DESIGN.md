@@ -13,7 +13,7 @@ Target PostgreSQL 18; prefer 18 when validated. UUIDv7 generated in application.
 | `archive.users` | Private owner, status; user ID stable until purge |
 | `archive.projects` | Owner-scoped metadata, optional instructions, archive status |
 | `archive.conversations` | Owner/project, parent branch, branch point, conversation_version, status |
-| `archive.messages` | Owner, conversation, dense local ordinal, role, state, current immutable revision pointer |
+| `archive.messages` | Owner, conversation, dense local ordinal, role, completed-only status, immutable selected revision pointer |
 | `archive.message_revisions` | Exact immutable content with ordinal/version and hash |
 | `archive.conversation_branch_revisions` | Immutable ordered inherited prefix references exact existing revisions |
 | `archive.attachments`, `archive.message_revision_attachments` | Owner-scoped metadata and revision attachment references; blob bytes outside DB |
@@ -27,7 +27,21 @@ Target PostgreSQL 18; prefer 18 when validated. UUIDv7 generated in application.
 
 ## Integrity requirements
 - Ownership relationships use `UNIQUE(user_id, entity_id)` and composite `(user_id, entity_id)` FKs. Every user-owned table is covered by FORCE RLS and authorized application filters; runtime role cannot bypass or own RLS-protected tables. Transaction-scoped `app.current_user_id` must be set only by trusted code. Security tests under actual runtime role.
-- Messages and memory-external content revisions are immutable. `messages.current_revision_id` must belong to the same `(user_id,message_id)`. Deferrable cycles allowed; commit guards required so completed messages cannot have null current revision.
+- Message revision records are immutable. Every persisted canonical message has
+  status `completed` and a selected revision belonging to the same
+  `(user_id,message_id)`. Deferrable insertion cycles are allowed, but a message
+  without its revision cannot survive commit. After selection, the pointer cannot
+  be replaced or cleared. Committed message identity, owner, conversation, role
+  and ordinal are immutable, with no application/internal operational exceptions.
+  Authorized conversation deletion/account purge remain separate lifecycle actions.
+- Canonical messages represent content, not inference attempts. User message and
+  initial revision commit with their pending run (T12). Assistant message and
+  revision are created only on success, with terminal run and eligible ingestion
+  job (T16). Failed/cancelled/interrupted attempts have no canonical assistant
+  message; partial output/state belong to runtime checkpoints (T07/T16). Consecutive
+  user messages are valid. Only committed successful user/assistant revision pairs
+  are eligible for managed-memory ingestion. Unsuccessful checkpoint retention and
+  explicit retry behavior remain unresolved and outside T05.
 - Branch parent owner must match; branch point must exist in the parent's visible history at exact revision. Branch snapshot ordinals dense and equal exact inherited visible prefix of parent as of creation; flatten branch-of-branch. These are transactional-service invariants with SQL-backed tests; SQL checks alone are insufficient. Descendant dependency-aware purge.
 - Conversations have `conversation_version` monotonic increment for visible-state mutation. Atomic message insert and run creation with operation idempotency; at most one nonterminal run per conversation via compatible DB constraint/index.
 - A model-run terminal update and finalized assistant message must commit atomically; partial output checkpoints stored separately rather than as many immutable revisions. Background ingestion enqueue atomic with eligible message finalization.
@@ -36,13 +50,25 @@ Target PostgreSQL 18; prefer 18 when validated. UUIDv7 generated in application.
 - Deleting conversation subtree purges exclusively associated message revisions, attachments and execution artifacts; **Mem0 memories unaffected**. Queued source-referencing ingestion jobs must be cancelled/fenced.
 
 ## Migrations and known validation gap
-T03–T07 implement separate forward-only Flyway V001–V005 SQL migrations in order, under independent reviewed PRs. This design package supplies specifications, not unexecuted candidate SQL. Require actual PostgreSQL 18 migration, privilege and integrity tests; v2-reference SQL is non-normative.
+T03–T07 implement separate forward-only Flyway V001–V005 SQL migrations in order,
+under independent reviewed PRs. V001/V002 are merged; T05 supplies candidate V003
+and real PostgreSQL/Flyway tests. V004/V005 remain specifications. Require actual
+PostgreSQL 18 migration, privilege and integrity evidence; v2-reference SQL is
+non-normative.
 
 ## Required SQL verification
 - Fresh migrate and second migrate/validate on supported PostgreSQL; inspect catalog constraints, RLS policies, role grants, indexes, triggers and migration checksum history.
 - Attempts at forged user_id, cross-owner FKs, missing actor context, malformed branch snapshots, revision updates, unsafe purge and duplicate active runs must fail.
 - Execute competing PostgreSQL transactions for message submission/version CAS, branch creation and job claiming; verify no duplicates or lost updates.
 - Test account deletion and restore fence semantics as an integration workflow (cannot be guaranteed from DDL alone).
+
+T05 supplies only V003 archive-local enforcement for projects, conversations,
+messages and revisions, reusing T04 users. T06 supplies branch linkage/snapshots;
+T07 supplies runtime tables. No runtime-linked atomicity or branch implementation
+is implied by V003. The owner-approved lifecycle is recorded in
+`../docs/decisions/FINAL_V1.md`. The shared draft `Message.status` alternatives
+still require separately authorized S01 reconciliation to `completed` only;
+T05 does not change the contract or its checksum manifest.
 
 
 ## Standalone runs, renewable sessions, and operation lookup (v1)
@@ -51,4 +77,6 @@ T03–T07 implement separate forward-only Flyway V001–V005 SQL migrations in o
 - `auth.sessions` needs configurable `expires_at` (sliding idle expiry), an immutable absolute expiry ceiling, revocation, and last-use fields. Successful authenticated activity may extend `expires_at` at a throttled cadence within ceiling; concurrently executing CLI instances must not invalidate one another. Sessions are keyed only by server-stored hash of bearer credential; no client token-management requirement.
 - `runtime.operation_ledger` must permit authenticated lookup by `(user_id, operation_type, idempotency_key)` returning safe operation/run/created-resource identities; include accepted-status semantics, operation retention policy, and non-sensitive response identity fields. A stable idempotency record must be committed atomically with the accepted operation.
 - Conversation-to-project reassignment is an owner-checked metadata mutation guarded by `expected_conversation_version`; a null project means unassigned. Preserve inherited branch snapshot pointers and previous ingestion provenance. Indexed metadata/list reads reflect new association.
-- No executable V001–V005 files are bundled. T03–T07 own their respective migrations. Never edit an already applied Flyway migration; validate fresh and upgrade paths against PostgreSQL 18.
+- T03–T07 own their respective V001–V005 migrations; current implementation and
+  recovery guidance are in `migrations/README.md`. Never edit an already applied
+  Flyway migration; validate fresh and upgrade paths against PostgreSQL 18.

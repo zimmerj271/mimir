@@ -15,6 +15,22 @@ Examples to seed the matrix (not test-pass claims): auth/session renewal → T24
 
 ## Complete acceptance ownership seed (not test execution evidence)
 
+T05 supporting archive-local coverage → `tests/integration/test_database.py`
+(`test_t05_*`), real PostgreSQL 18/Flyway. The suite covers V003 fresh/repeat/restart,
+V002 upgrade rollback/recovery and drift, atomic message/revision pairs, mandatory
+selected revisions at commit (including actor-context changes), completed-only
+status, same-owner/same-message pointers, immutable message fields/revisions,
+consecutive user messages, UTF-8 boundaries, dense numbering, real runtime RLS and
+grants, composite owner relationships and competing appends/metadata CAS.
+This supplies archive-local DB-01/DB-02/DB-03 and DB-05 storage support, plus
+supporting DB-ROLE-01/DB-MIG-01 evidence. Full submission/run/job atomicity, branch
+snapshots, inference, deletion and V001–V005 acceptance remain successor work.
+The owner-approved clarification is recorded in
+`backend/milestones/T05_archive-core-schema.md` and `docs/decisions/FINAL_V1.md`.
+Normative acceptance ownership/status remain unchanged; actual results and exact
+submitted SHA belong to the T05 PR. The shared contract status mismatch is recorded
+for separately authorized reconciliation, not claimed resolved by T05.
+
 T04 supporting identity/session database coverage →
 `tests/integration/test_database.py` (the `test_t04_*` cases), using real
 PostgreSQL 18/Flyway. This covers V002 fresh/repeat/restart, V001-to-V002 upgrade

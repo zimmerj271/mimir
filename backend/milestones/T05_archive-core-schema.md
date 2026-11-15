@@ -3,16 +3,63 @@
 **Milestone:** M1  
 **Branch:** `feature/t05-archive-core-schema` (from updated `main`)  
 **Dependencies:** T04  
-**Status:** Design brief only; not implemented or tested.
+**Status:** V003 implementation candidate and executable PostgreSQL tests supplied
+on the T05 branch; independent review and human merge approval pending. Exact
+results and the submitted commit are recorded in the PR.
 
 ## Objective / authorized scope
 Owner-scoped users/projects/conversations/messages revisions base relational schema.
+
+Reuse T04 users. Add V003 projects, conversations, messages and message revisions;
+preserve applied V001/V002. Initial base was merged T04 (PR #5),
+`105d4747299ab317c0d5dda5469d892bcdbc66e2`. Submission base `main` is
+`e9a122836f09ff9256aa20d346c2b422f9982363`, including the independently reviewed
+and owner-merged deployment correction (PR #6). The owner explicitly authorized
+resuming T05 after that merge; retain the Compose-only deployment decision.
+
+## Explicit owner-approved lifecycle clarification
+
+The owner approved these rules during the T05 assignment and authorized their
+recording in the decision ledger and relevant normative design documents:
+
+- Archive owns authoritative content; runtime exclusively owns execution state.
+  Canonical messages persist only as `completed`, with their exact immutable
+  selected revision. A missing revision is permitted only before transaction commit.
+- User message/initial revision commit atomically with pending run (T12).
+  Assistant message is created only on success, atomically with revision, terminal
+  run and eligible ingestion job (T16). Failed/cancelled/interrupted runs create no
+  canonical assistant message. Partial output and failure state remain runtime
+  checkpoints/streaming concerns. Only successfully committed user/assistant
+  revision pairs are ingestion-eligible. Consecutive user messages are valid.
+- Revision rows and committed message identity/owner/conversation/role/ordinal
+  are immutable. Selected revision must match message and owner and cannot be
+  replaced or cleared. No application/internal operational exceptions. Authorized
+  archive deletion/account purge remain governed by their approved lifecycles.
+- Keep separate messages/revisions. Edits/regeneration create new conversations;
+  inherited history references exact revisions without copying text. T06 retains
+  branch snapshots; T07 runtime schema/checkpoints; T12 submission/run atomicity;
+  T16 inference/finalization. T05 must not implement these successors.
+- Unsuccessful checkpoint retention and explicit retry behavior remain unresolved.
+- `contracts/openapi.yaml` still lists pending/failed/interrupted canonical message
+  states. Desired semantics are `completed` only. Record the discrepancy and obtain
+  separate contract-governance authorization before editing protected contract
+  artifacts or their manifest. T05 adds no public HTTP/event implementation.
 
 ## Out of scope
 Do not implement successor tasks, change shared contracts or introduce major dependencies without approval. No public per-memory CRUD, application-owned canonical memory tables, hidden direct client database/provider access, or future-web implementation.
 
 ## Required test scenarios and acceptance
 Composite owner FKs, immutable revisions, active version constraints exercised on PostgreSQL. Add pertinent failure, auth, boundary and concurrency tests. Prefer deterministic unit tests where possible and real-service integration tests when persistence/provider guarantees are involved.
+
+Cover atomic message/revision creation, commit-time rejection of missing selected
+revision, unsupported states, wrong-message/wrong-owner pointers, revision updates,
+pointer replacement/removal and immutable message identity/order changes. Verify
+consecutive user messages, dense local ordinals/revision numbers, content byte
+boundaries, owner FKs, actual runtime RLS/grants, fresh/upgrade Flyway validation,
+transaction rollback/recovery, drift and competing transactions on PostgreSQL 18.
+Acceptance coverage: archive-local DB-01/DB-02/DB-03 and DB-05 storage support;
+supporting DB-ROLE-01/DB-MIG-01 evidence only. Full submission, branch, runtime,
+deletion and V001–V005 acceptance remain successor work.
 
 ## Required engineering review
 - Read `AGENTS.md`, `CODING_STANDARDS.md`, `ARCHITECTURE.md` and relevant domain documents before coding.
