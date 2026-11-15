@@ -42,6 +42,13 @@ acceptance. Actual command evidence and submitted SHA belong to the T03 PR.
 
 T02 DEPLOY-01 configuration/isolation/persistence coverage is implemented by
 `backend/tests/test_compose_policy.py` and `tests/integration/test_compose.py`.
+The owner-approved T02 networking correction additionally maps to
+`backend/tests/test_migrations.py` and `tests/integration/test_database.py` for all
+optional migration jobs' policy rejection and live private-network attachments.
+Default/backend/migration profile combinations reuse Compose-managed Ollama and
+service DNS. Native host-installed Ollama support is retired by
+`docs/decisions/COMPOSE_NETWORKING_CORRECTION.md`; the prior host-mode CI result
+remains historical evidence. No normative acceptance owner is reassigned.
 The real-engine suite uses a test-only backend port probe; application serving,
 schema readiness, native macOS runtime and full installation acceptance remain
 unverified. OPS-01 retains its not-implemented status for application/recovery

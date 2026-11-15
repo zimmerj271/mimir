@@ -10,12 +10,14 @@
       ],
       "tests": [
         "backend/tests/test_compose_policy.py",
-        "tests/integration/test_compose.py"
+        "backend/tests/test_migrations.py",
+        "tests/integration/test_compose.py",
+        "tests/integration/test_database.py"
       ],
       "kind": "integration",
       "status": "implemented",
       "last_verified_commit": null,
-      "evidence": "T02 PR: policy, real service isolation/persistence and test-only port probe; real API/native macOS/full installation acceptance remains unverified."
+      "evidence": "T02 PR #3 records original configuration/isolation/persistence evidence. Owner-approved networking correction retires host-installed Ollama and verifies Compose-only DNS/profiles plus optional migration jobs. Exact corrected results/SHA belong to its PR; real API/native macOS/full installation acceptance remains unverified."
     },
     {
       "id": "DEPLOY-02",
@@ -947,6 +949,25 @@
       ],
       "tests": [
         "backend/tests/test_migrations.py",
+        "tests/integration/test_database.py"
+      ]
+    },
+    "T02": {
+      "specification": "backend/milestones/T02_compose-foundation.md",
+      "requirements": [
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "DEPLOY-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "OPS-01"
+        }
+      ],
+      "tests": [
+        "backend/tests/test_compose_policy.py",
+        "backend/tests/test_migrations.py",
+        "tests/integration/test_compose.py",
         "tests/integration/test_database.py"
       ]
     }

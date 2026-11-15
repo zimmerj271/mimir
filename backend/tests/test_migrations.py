@@ -101,6 +101,19 @@ def test_compiled_migration_policy(migration_config: dict) -> None:
     policy.validate_files(migration_config)
 
 
+@pytest.mark.parametrize("service", ("role-bootstrap", "flyway", "role-credentials"))
+@pytest.mark.parametrize(
+    "override",
+    ({"network_mode": "host"}, {"extra_hosts": {"postgres": "host-gateway"}}),
+)
+def test_all_optional_migration_jobs_reject_host_access(
+    migration_config: dict, service: str, override: dict
+) -> None:
+    migration_config["services"][service].update(override)
+    with pytest.raises(PolicyError, match="host access/overrides forbidden"):
+        MigrationPolicy().validate(migration_config)
+
+
 @pytest.mark.parametrize(
     "fault",
     [

@@ -84,33 +84,36 @@ instead of silently replacing data. Stop using
 them. Backup/restore, encryption/retention, major upgrades and the connected
 installer remain separately owned tasks.
 
-## Explicit host-installed Ollama endpoint
+## Compose networking in every profile
 
-Container Ollama is the default. Explicitly select `compose.host-ollama.yaml` for
-the standalone-Linux bridge case, preserving internal `ollama:11434` naming.
-Start the foundation network first; inspect its actual IPv4 gateway:
+Backend uses `http://ollama:11434` through Compose service DNS. Ollama remains on
+the private network, uses the existing external `ollama_data` volume and publishes
+no host port. All optional services follow the same networking boundary:
 
-```sh
-docker network inspect mimir_private --format '{{(index .IPAM.Config 0).Gateway}}'
-```
+| Configuration | Services and network attachments |
+|---|---|
+| Default `compose.yaml` | PostgreSQL, Qdrant and Ollama on `private` |
+| Explicit `backend` profile | Backend on `private` and the loopback-publishing `api` bridge; providers stay on `private` |
+| Explicit migration overlay/profile | `role-bootstrap`, `flyway` and `role-credentials` on `private`; backend/provider attachments are unchanged |
 
-Set `MIMIR_HOST_OLLAMA_IP` to that address. In another terminal, explicitly run
-the selected host Ollama binary (0.40.6) with
-`OLLAMA_NO_CLOUD=true OLLAMA_HOST="$MIMIR_HOST_OLLAMA_IP:11434" ollama serve`. Bind only that dedicated
-bridge address, never a LAN/wildcard interface. Then validate and select the mode:
+The backend profile is still disabled until application tasks supply its actual
+command/readiness checks. The migration overlay is an operator-only action through
+the [database provisioning guide](database/README.md), not part of default startup.
+No service uses host networking, a host-gateway provider alias or a per-deployment
+host-firewall exception for internal service communication.
 
-```sh
-uv run --project backend --locked python deployment/validate_compose.py --host-ollama
-docker compose -f deployment/compose.yaml -f deployment/compose.host-ollama.yaml up -d --wait --remove-orphans
-```
+The [owner-approved networking correction](../docs/decisions/COMPOSE_NETWORKING_CORRECTION.md)
+retires the native host-installed Ollama alternative. Remove
+`-f deployment/compose.host-ollama.yaml`, `MIMIR_HOST_OLLAMA_IP` and `--host-ollama`
+from deployment commands and use the
+foundation startup above. The removed flag fails explicitly; it does not silently
+select a provider. Existing container model volumes are retained. Native host model
+files are not imported or deleted, and native processes/firewall rules are not
+changed automatically. Model provisioning remains a separately informed action.
 
-Validation compares the alias with the actual existing private bridge gateway;
-loopback, arbitrary endpoints and mismatched gateways fail. This removes container
-Ollama from the active set without deleting its model volume. No host configuration
-or provider choice is silently changed. A Linux bridge alias does not reach a
-host's 127.0.0.1-only listener. Native Docker Desktop/macOS host connectivity and
-installation lifecycle remain unverified for DEPLOY-01; the v1 Linux/macOS target
-is unchanged. This is not a platform support or release-readiness claim.
+Linux/macOS v1 targets are unchanged. Native macOS container execution and complete
+installation acceptance remain DEPLOY-01 work; these instructions are not a
+platform support or release-readiness claim.
 
 No model provisioning, GPU scheduling, Mem0 adapter, automatic downloads or
 unapproved network relay is included. Informed model provisioning/egress remains
@@ -127,7 +130,9 @@ Only owned test resources are eligible for cleanup; operator volumes are retaine
 Real-engine tests cover compiled topology, external volume survival after
 `down --volumes`, PostgreSQL data/Qdrant collection/model-volume persistence,
 rejected service authentication, empty-secret rejection, cross-network isolation,
-actual loopback bindings and a Linux host-local Ollama endpoint. Backend commands
+actual loopback bindings, Compose-only provider DNS and the default/backend/migration
+profile combinations. The database suite additionally inspects all three optional
+migration jobs' live private-network attachments. Backend commands
 and health checks in the suite are explicit test-only HTTP port probes. A separate
 test proves the foundation image cannot start a placeholder API and excludes
 development tools. These do not prove application auth, readiness or API behavior.

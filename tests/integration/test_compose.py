@@ -21,6 +21,7 @@ import mimir_backend
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "deployment"))
+from migrate import JOBS, MigrationPolicy  # noqa: E402
 from validate_compose import ComposePolicy  # noqa: E402
 
 
@@ -62,7 +63,6 @@ class Stack:
         self.write_probe_model(self.model, self.file)
         self.volume_names = [item["name"] for item in self.model["volumes"].values()]
         self.outside = f"{self.project}_outside"
-        self.host_provider = f"{self.project}-host-ollama"
 
     def docker(
         self, *args: str, input: str | None = None, check: bool = True
@@ -179,7 +179,6 @@ class Stack:
         ][0]["Gateway"]
 
     def cleanup(self) -> None:
-        self.remove_owned("container", self.host_provider)
         if self.owns_project:
             self.compose("down", "--remove-orphans", check=False)
         self.remove_owned("network", self.outside)
@@ -397,62 +396,58 @@ def test_empty_credentials_fail_before_startup(
         path.write_bytes(original)
 
 
-def test_explicit_linux_host_ollama_endpoint(stack: Stack) -> None:
-    # Real Ollama in the host network models a host-local process, without
-    # installing software on the runner or binding a LAN/wildcard interface.
-    stack.compose("stop", "ollama")
-    gateway = stack.gateway()
-    stack.env["MIMIR_HOST_OLLAMA_IP"] = gateway
-    host_model = json.loads(
-        stack.docker(
-            "compose",
-            *stack.source,
-            "-f",
-            str(ROOT / "deployment/compose.host-ollama.yaml"),
-            "--profile",
-            "backend",
-            "config",
-            "--format",
-            "json",
-        ).stdout
-    )
-    ComposePolicy().validate(host_model, gateway)
-    host_file = stack.directory / "host-only-probe.json"
-    stack.write_probe_model(host_model, host_file)
-    stack.docker(
-        "run",
-        "-d",
-        "--name",
-        stack.host_provider,
-        "--network",
-        "host",
-        "--label",
-        f"mimir.t02_test={stack.token}",
-        "--cap-drop",
-        "ALL",
-        "--security-opt",
-        "no-new-privileges:true",
-        "-e",
-        f"OLLAMA_HOST={gateway}:11434",
-        "-e",
-        "OLLAMA_NO_CLOUD=true",
-        "-v",
-        f"{stack.project}_ollama:/root/.ollama",
-        stack.model["services"]["ollama"]["image"],
-        "serve",
-    )
-    stack.docker(
-        "compose", "-f", str(host_file), "up", "-d", "--wait", "--wait-timeout", "120"
-    )
-    # The host Ollama can start after the topology; bounded retries stay in the
-    # test client and do not implement application retry/provider behavior.
+@pytest.mark.parametrize("mode", ("default", "backend", "migrations"))
+def test_profiles_use_compose_dns_and_private_service_networks(
+    stack: Stack, mode: str
+) -> None:
+    # Compile each supported real source combination. Migration execution and
+    # live job attachments are additionally covered by the database suite.
+    command = ["compose", *stack.source]
+    expected = {"postgres", "qdrant", "ollama"}
+    if mode == "migrations":
+        command.extend(["-f", str(ROOT / "deployment/compose.migrations.yaml")])
+    if mode != "default":
+        command.extend(["--profile", "backend"])
+        expected.add("backend")
+    if mode == "migrations":
+        command.extend(["--profile", "migrations"])
+        expected |= JOBS
+    command.extend(["config", "--format", "json"])
+    model = json.loads(stack.docker(*command).stdout)
+    assert set(model["services"]) == expected
+    if mode == "migrations":
+        MigrationPolicy().validate(model)
+    elif mode == "backend":
+        ComposePolicy().validate(model)
+    for name, service in model["services"].items():
+        assert not service.get("network_mode")
+        assert not service.get("extra_hosts")
+        assert set(service["networks"]) == (
+            {"private", "api"} if name == "backend" else {"private"}
+        )
+        if name != "backend":
+            assert not service.get("ports")
+    assert model["volumes"]["ollama_data"]["external"] is True
+    assert model["volumes"]["ollama_data"]["name"] == f"{stack.project}_ollama"
+
+    private = stack.model["networks"]["private"]["name"]
+    api = stack.model["networks"]["api"]["name"]
+    for name in ("backend", "postgres", "qdrant", "ollama"):
+        info = stack.info(name)
+        assert info["State"]["Running"]
+        assert info["HostConfig"]["NetworkMode"] != "host"
+        assert not info["HostConfig"].get("ExtraHosts")
+        assert set(info["NetworkSettings"]["Networks"]) == (
+            {private, api} if name == "backend" else {private}
+        )
+    ollama = stack.info("ollama")
+    assert ollama["State"]["Health"]["Status"] == "healthy"
+    address = ollama["NetworkSettings"]["Networks"][private]["IPAddress"]
     script = (
-        "import json,time,urllib.request; "
-        "\nfor attempt in range(30):"
-        "\n try:"
-        "\n  result=json.load(urllib.request.urlopen('http://ollama:11434/api/tags',timeout=2)); "
-        "assert result['models']==[]; break"
-        "\n except OSError: time.sleep(0.5)"
-        "\nelse: raise SystemExit('host-local Ollama endpoint unavailable')"
+        "import json,socket,urllib.request; "
+        "print(json.dumps({'address':socket.gethostbyname('ollama'),"
+        "'models':json.load(urllib.request.urlopen('http://ollama:11434/api/tags',"
+        "timeout=5))['models']}))"
     )
-    stack.compose("exec", "-T", "backend", "python", "-c", script)
+    response = stack.compose("exec", "-T", "backend", "python", "-c", script)
+    assert json.loads(response.stdout) == {"address": address, "models": []}

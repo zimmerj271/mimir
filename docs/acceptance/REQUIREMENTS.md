@@ -2,7 +2,7 @@
 
 | ID | Primary owner | Verification owner | Executable outcome required |
 |---|---|---|---|
-| DEPLOY-01 | T02 | DEPLOY-01 | Only backend exposed at host loopback; DB/vector/Ollama container ports private |
+| DEPLOY-01 | T02 | DEPLOY-01 | Only backend exposed at host loopback; DB/vector/Ollama and optional jobs use private Compose networks/service DNS; no host-network containers or host-gateway provider overrides |
 | DEPLOY-02 | DEPLOY-01 | T41 | Connected installer provisions pinned Compose services + native CLI; volumes survive upgrade/uninstall |
 | DEPLOY-03 | T37 | DEPLOY-01 | Offline consistent manual restore replays deletion journal before serving |
 | DB-ROLE-01 | T03 | T40 | Real Postgres 18 tenant RLS, role separation and grant checks |
