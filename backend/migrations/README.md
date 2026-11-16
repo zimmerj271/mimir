@@ -1,8 +1,9 @@
 # Flyway SQL migrations
 
 T03 implements `V001__roles_and_schemas.sql`. T04 implements
-`V002__users_identities_and_sessions.sql`. T05–T07 own V003 archive, V004 branches
-and V005 runtime/jobs, each in a separately reviewed PR.
+`V002__users_identities_and_sessions.sql`. T05 adds
+`V003__projects_conversations_and_messages.sql`. T06/T07 own V004 branches and
+V005 runtime/jobs, each in a separately reviewed PR.
 No Alembic or ORM-generated production DDL.
 Historical `../appendix/v2-reference/` SQL is non-normative and must not run.
 
@@ -92,3 +93,67 @@ unapplied SQL, then explicitly migrate/validate again. After successful V002,
 reverting Git does not undo the schema. Any reversal requires separately approved
 forward SQL or a coordinated restore; never edit applied V001/V002, clean/repair
 history or remove retained volumes. Account purge/restore remains T35/T37 work.
+
+## V003 archive storage
+
+Authority: the owner's explicit T05 lifecycle/immutability clarification in
+[FINAL_V1](../../docs/decisions/FINAL_V1.md) and the
+[T05 brief](../milestones/T05_archive-core-schema.md). Initial base was merged T04,
+`105d4747299ab317c0d5dda5469d892bcdbc66e2`; submission base is
+`e9a122836f09ff9256aa20d346c2b422f9982363`, including merged deployment correction
+PR #6. V001/V002 are unchanged.
+
+V003 adds owner-scoped projects (optional instructions), nullable-project
+conversations, canonical messages and separate immutable content revisions.
+Conversations begin at version 1. Metadata changes require an increasing version;
+versions and update timestamps cannot move backwards. Application CAS and
+message/run/version atomicity remain T10/T12/T16 work. No automatic message-insert
+version increment substitutes for those transactions.
+
+Messages have only `completed` status. To insert a message/revision pair, first
+insert the message with either its intended revision ID or a null pointer; insert
+its revision; fill the pointer if initially null; commit. The same-owner,
+same-message FK is deferred and the deferred trigger rejects a null final pointer.
+The selected pointer cannot be changed once non-null, even before commit. This
+deliberately stronger insertion rule removes any need to detect transaction age.
+Committed message identity, owner, conversation, ordinal, role/status and creation
+time cannot change; all revision updates are rejected. Revisions may be appended
+with dense numbers but can never replace an already selected revision or edit
+canonical history. The normal v1 creation path selects its initial revision.
+
+Local message ordinals and per-message revision numbers start at 1 and append
+densely under parent-row locks in READ COMMITTED. Consecutive user messages are
+allowed. Revisions store exact `text/v1` content (at most 1 MiB UTF-8 bytes) and an
+insertion-derived SHA-256 digest. No extension or application dependency is added.
+Branch inherited ordinals/snapshots are T06 work; no branch schema is supplied.
+
+All four tables ENABLE/FORCE RLS, use composite owner FKs and belong to the
+NOLOGIN owner. API/worker can read their tenant's archive and insert message pairs;
+API can create/update project/conversation metadata; worker can advance conversation
+version/update time. Messages expose only pointer UPDATE for insertion ordering.
+Auth/maintenance have no archive table grants. No runtime receives DELETE,
+TRUNCATE, revision UPDATE, DDL or direct trigger-routine EXECUTE. Restricted purge
+interfaces remain T35/T36 work, not a global immutability bypass switch.
+
+The deferred completeness trigger runs as owner with a fixed search path and
+`row_security=on`. A SELECT-only owner policy on messages lets it inspect its exact
+owner/message even after transaction actor context is cleared/switched. Other
+logins gain neither owner membership nor direct routine access; no SECURITY DEFINER
+write interface or broad runtime policy is introduced.
+
+`make database-check` includes real fresh V001–V003, V002-to-V003 upgrade, migration
+rollback/retry, repeat/validate/restart, drift, runtime RLS/grants, immutable history,
+commit guard, UTF-8 boundaries, dense numbering and competing append/CAS tests.
+Tests use labelled disposable volumes; production/operator volumes are untouched.
+Schema and data rollback are exercised, not simulated by an ORM.
+
+If unapplied V003 fails, keep service closed, verify transactional rollback and
+unchanged V001/V002 history, review/correct only unapplied SQL, then explicitly
+migrate/validate. After success, Git revert does not undo schema: reversal requires
+separately approved forward SQL or coordinated restore. Never edit applied
+migrations, repair/clean history or delete retained volumes.
+
+Cross-domain runtime transactions, inference, managed-memory delivery, branch
+snapshots, checkpoint retention and explicit failed-attempt retries are not
+implemented or verified here. Shared `Message.status` contract reconciliation to
+`completed` only still needs separate authorization; no contract artifact changes.

@@ -970,6 +970,38 @@
         "tests/integration/test_compose.py",
         "tests/integration/test_database.py"
       ]
+    },
+    "T05": {
+      "specification": "backend/milestones/T05_archive-core-schema.md",
+      "requirements": [
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-02"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-03"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-05"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "DB-ROLE-01"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "DB-MIG-01"
+        }
+      ],
+      "tests": [
+        "tests/integration/test_database.py"
+      ]
     }
   }
 }

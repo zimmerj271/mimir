@@ -25,7 +25,20 @@
 
 ## 3. Conversations and branching
 - Every resource has one private owner. One project owns zero or more conversations; every conversation belongs to at most one project. No cross-user sharing.
-- Every assistant answer is a canonical assistant message with separately stored model execution metadata. User message is committed before inference. Streamed token deltas are NOT individual message revisions; partial output uses execution checkpoints, with at most one final assistant revision per run.
+- Every successfully completed assistant answer is a canonical assistant message
+  with separately stored model execution metadata. User message and initial
+  revision commit atomically with a pending run before inference. Assistant
+  messages are created only on successful finalization. Failed, cancelled and
+  interrupted runs create no canonical assistant message. Streamed token deltas
+  and partial output use runtime checkpoints, never canonical message revisions.
+  Clients can present provisional/unsuccessful attempts through run interfaces.
+- All persisted canonical messages have status `completed` and a selected exact
+  immutable revision. A temporarily missing pointer is allowed only within an
+  uncommitted transaction. Committed message identity, owner, conversation, role,
+  ordinal and selected revision are immutable; the pointer cannot be replaced or
+  cleared. No application/internal operational exception exists. Authorized archive
+  deletion/account purge remain governed lifecycle operations. Preserve separate
+  message and revision records. Consecutive user messages are valid.
 - Immutable message revisions. Editing upstream messages, regeneration, or branching creates a **new conversation** with a new ID. Its inherited visible prefix is an immutable ordered snapshot of **references to exact parent message revisions** (flatten nested branches). Never copy inherited text. Parent edits cannot change descendants. New branch inherits the parent's project at creation and is independent thereafter.
 - Branch creation does not re-ingest inherited messages into memory. Deletion of a conversation also purges dependent descendant-branch subtree and associated archive artifacts; memory remains untouched.
 - Optimistic `conversation_version` guards writes; one nonterminal generation run per conversation; parallel work across separate conversations is allowed subject to resource limits.
@@ -51,6 +64,15 @@
 - Streaming-first; collecting the stream provides a nonstreaming result. Typed events include `started`, `text_delta`, `usage`, and exactly one terminal outcome of `completed`, `failed`, `cancelled` or `interrupted`. Preserve monotonic event sequences and `run_id`.
 - Durable model runs independently of connections. Conversational submissions atomically persist user message and pending run; standalone submissions atomically persist a conversation-independent run and operation identity without an archive message. Both execute outside database transactions. For conversational runs, final output is committed atomically with the terminal run state and an eligible ingestion job. Standalone runs finalize result and terminal state without canonical messages or memory ingestion. Partial output checkpointed separately. Cancellation explicit and idempotent; client disconnect does not automatically cancel.
 - No automatic restart after user-visible output; limited transient retries before output only; one controlled overflow retry if safe. No automatic hosted fallback. Regeneration creates a separate conversation branch.
+
+The owner-approved T05 clarification in `../docs/decisions/FINAL_V1.md` does not
+resolve unsuccessful conversational checkpoint retention or explicit retry
+behavior. T05 implements archive-local SQL integrity only; T06/T07/T12/T16 retain
+branch snapshots, runtime storage, atomic submission and atomic successful
+assistant/revision/run/eligible-job finalization respectively. Only successfully
+committed user/assistant revision pairs are ingestion-eligible. Shared
+`Message.status` must be reconciled to `completed` only through separately
+authorized contract governance; T05 does not alter protected contract artifacts.
 
 ## 7. API and transport
 - Shared FastAPI resource API at `/api/v1`, OpenAPI 3.1 with separate normative SSE event schema. No Mem0/Ollama types in public responses. Thin HTTP handlers.
