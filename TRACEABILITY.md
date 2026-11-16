@@ -15,6 +15,22 @@ Examples to seed the matrix (not test-pass claims): auth/session renewal → T24
 
 ## Complete acceptance ownership seed (not test execution evidence)
 
+T06 supporting branch-storage coverage → `tests/integration/test_database.py`
+(`test_t06_*`), real PostgreSQL 18/Flyway. DB-04 covers flattened nested prefixes,
+exact inherited revision references, both approved branch boundaries, empty
+prefixes and parent append/revision-mutation isolation. DB-01/DB-MIG-01 receive
+V004 fresh/repeat/restart, V003 upgrade, transactional rollback/recovery and
+checksum-drift support. DB-02/DB-ROLE-01 receive runtime RLS/view isolation,
+missing/malformed actor context, least privilege and composite owner FK tests.
+DB-05 receives competing branch/append/delete transaction support; DB-07 receives
+dependency-FK retention support only. Negative tests reject incomplete, gapped,
+reordered, extra or substituted snapshots, immutable-link/reference changes and
+invalid branch points; deferred validation survives actor changes and savepoint
+rollback. Branch services, HTTP/authentication, version/idempotency transactions,
+runtime atomicity, governed subtree purge, memory behavior and complete V001–V005
+acceptance remain successor work. Normative ownership/status are unchanged;
+actual commands/results and submitted SHA belong to the T06 PR.
+
 T05 supporting archive-local coverage → `tests/integration/test_database.py`
 (`test_t05_*`), real PostgreSQL 18/Flyway. The suite covers V003 fresh/repeat/restart,
 V002 upgrade rollback/recovery and drift, atomic message/revision pairs, mandatory
