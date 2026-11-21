@@ -2,8 +2,9 @@
 
 T03 implements `V001__roles_and_schemas.sql`. T04 implements
 `V002__users_identities_and_sessions.sql`. T05 adds
-`V003__projects_conversations_and_messages.sql`. T06/T07 own V004 branches and
-V005 runtime/jobs, each in a separately reviewed PR.
+`V003__projects_conversations_and_messages.sql`. T06 adds
+`V004__immutable_branch_snapshots.sql`; T07 owns V005 runtime/jobs in a
+separately reviewed PR.
 No Alembic or ORM-generated production DDL.
 Historical `../appendix/v2-reference/` SQL is non-normative and must not run.
 
@@ -155,5 +156,85 @@ migrations, repair/clean history or delete retained volumes.
 
 Cross-domain runtime transactions, inference, managed-memory delivery, branch
 snapshots, checkpoint retention and explicit failed-attempt retries are not
-implemented or verified here. Shared `Message.status` contract reconciliation to
+implemented or verified by V003. Shared `Message.status` contract reconciliation to
 `completed` only still needs separate authorization; no contract artifact changes.
+
+## V004 immutable branch snapshots
+
+Authority: [T06](../milestones/T06_branch-schema.md),
+[FINAL_V1](../../docs/decisions/FINAL_V1.md) and the approved branch modes in
+the shared contract. Base `main` is merged T05,
+`f12d4c78921aa5cacba3229b2846ac408a0b2f15` (PR #7). V001–V003 are unchanged.
+
+Conversations gain immutable parent, exact branch-point revision, branch mode
+and derived inherited-prefix length. Roots retain null linkage and zero inherited
+length. A new branch must supply its parent's current project association;
+association changes after creation remain independent. The parent row is locked
+before reading its history, sharing V003's READ COMMITTED append/metadata lock.
+The point must be an exact selected revision in that parent's visible history.
+`after_revision` includes the point; `replace_message` excludes it, allowing an
+empty prefix when replacing the first message. Neither mode starts inference.
+
+In one transaction, insert the branch conversation, then insert its complete
+ordered prefix into `archive.conversation_branch_revisions` before commit.
+Each entry stores only owner, child conversation, visible ordinal, message ID and
+exact revision ID. Composite FKs enforce owner/message/revision relationships.
+An immediate invoker-rights insertion guard rejects ordinals above the frozen
+prefix length using one owned-conversation lookup, without scanning snapshots.
+Positive ordinals and uniqueness remain table constraints. One deferred check per
+new conversation counts its final references and compares them with the exact
+parent prefix using a set difference. Missing, reordered, gapped or substituted
+references cannot commit, even when trusted code has cleared/switched actor
+context. The complete validator is not queued per reference. Parent linkage and
+prefix length cannot change; snapshot UPDATE is rejected, including by the owner.
+A complete prefix occupies every slot from one through its frozen length, so
+uniqueness plus the immediate upper bound also forbid later extension, including
+after an explicit successful `SET CONSTRAINTS ALL IMMEDIATE`.
+
+`archive.conversation_visible_revisions` is a security-invoker view combining
+flattened inherited references with local messages. V003's local ordinals still
+start at one; visible local ordinals add the frozen prefix length. Nested branches
+copy references from this view, never text. Parent appends, appended unselected
+revisions, or project reassignment cannot rewrite inherited history; canonical
+content/pointer mutation remains prohibited by V003.
+
+The new table ENABLEs/FORCEs RLS. API can insert tenant snapshots; API/worker can
+read the table/view. No runtime snapshot UPDATE/DELETE/TRUNCATE, direct trigger
+EXECUTE, owner membership or worker branch INSERT is granted. The deferred
+SECURITY DEFINER trigger has a fixed search path and `row_security=on`;
+SELECT-only owner policies on conversations/snapshots support actor-independent
+commit validation. No runtime definer write interface is added. FKs retain
+dependent parents/revisions until a separately authorized subtree purge.
+
+`make database-check` includes `test_t06_*` real PostgreSQL 18/Flyway fresh,
+repeat, restart, V003 upgrade, transactional DDL rollback/retry and checksum drift
+tests, plus nested branches, boundary/negative cases, role/RLS checks and competing
+branch/append/delete transactions. Tests use labelled disposable volumes only.
+Large-prefix tests cover 1,000/2,000/5,000 references from root and nested parents,
+assert one full-validator invocation per new conversation with transaction-local
+PostgreSQL function counters, and report transaction timings through successful
+commit. Function tracking is configured only in the isolated test stack; runtime
+permissions and deployment configuration are unchanged. Multiple insertion
+statements/branches, early constraint checks and extension of empty/complete
+snapshots are regression cases. Timing reports are measurements, not release SLOs.
+The [traceability mapping](../../TRACEABILITY.md) describes partial storage
+acceptance; actual command results and submitted SHA belong to the PR.
+
+For failed unapplied V004: keep services closed, verify V003 history/data remain
+intact and V004 objects rolled back, review/correct only unapplied SQL, explicitly
+retry migrate, then validate. After successful V004 there is no down migration:
+Git revert does not undo schema. Reversal requires separately approved forward
+SQL or coordinated offline restore. Never edit applied history, repair/clean
+checksums, or remove retained volumes.
+
+PR #8 review R1 corrects the candidate V004 validation mechanism within T06.
+The owner confirmed V004 had only been applied to disposable test databases and
+authorized this correction; no retained migration history is rewritten. Existing
+disposable databases with the old checksum must not be repaired for reuse.
+Recreate only owned disposable test stacks from the revised candidate. Applied
+non-disposable V004 would instead require separately authorized forward SQL.
+
+No branch service/HTTP producer, version/idempotency transaction, inference,
+memory ingestion or governed subtree purge is implemented here (T10/T11/T12,
+T16/T33 and T35/T36 retain those boundaries). No contract/dependency changes;
+S01 validation and the recorded `Message.status` reconciliation remain pending.

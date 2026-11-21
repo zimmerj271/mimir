@@ -1,7 +1,7 @@
-"""T03/T04/T05 real PostgreSQL 18/Flyway tests, never skip a missing daemon.
+"""T03–T06 real PostgreSQL 18/Flyway tests, never skip a missing daemon.
 
 All fixtures use unique labelled disposable volumes. T03 fixtures stop at V001;
-T04/T05 exercise real V002/V003 on fresh and upgrade paths.
+T04–T06 exercise real V002–V004 on fresh and upgrade paths.
 """
 
 import concurrent.futures
@@ -2130,3 +2130,742 @@ def test_t05_governed_deletion_has_no_immutability_update_bypass(archive_rows):
         rows.actor("SELECT count(*) FROM archive.message_revisions").stdout.strip()
         == "0"
     )
+
+
+V004 = "V004__immutable_branch_snapshots.sql"
+
+
+class BranchRows(ArchiveRows):
+    def seed_prefix(self, count):
+        self.actor(
+            ";".join(self.message_sql(ordinal) for ordinal in range(2, count + 1))
+        )
+        return self.actor(f"""
+            SELECT revision_id FROM archive.conversation_visible_revisions
+            WHERE conversation_id='{self.conversation}' AND ordinal={count}
+        """).stdout.strip()
+
+    def validation_calls_sql(self):
+        return """
+            SELECT coalesce(sum(calls),0) FROM pg_stat_xact_user_functions
+            WHERE funcid='archive.require_exact_branch_snapshot()'::regprocedure
+        """
+
+    def branch_sql(self, child, parent=None, point=None, mode="after_revision"):
+        parent = parent or self.conversation
+        point = point or self.revision
+        return f"""
+            INSERT INTO archive.conversations(conversation_id,user_id,project_id,title,
+                parent_conversation_id,branch_point_revision_id,branch_mode)
+            SELECT '{child}','{self.user}',project_id,'synthetic branch',
+                '{parent}','{point}','{mode}' FROM archive.conversations
+                WHERE conversation_id='{parent}'
+        """
+
+    def snapshot_sql(self, child, parent=None):
+        return f"""
+            INSERT INTO archive.conversation_branch_revisions
+                (user_id,conversation_id,ordinal,message_id,revision_id)
+            SELECT p.user_id,'{child}',p.ordinal,p.message_id,p.revision_id
+            FROM archive.conversation_visible_revisions p
+            JOIN archive.conversations c ON c.user_id=p.user_id
+                AND c.conversation_id='{child}'
+            WHERE p.conversation_id='{parent or self.conversation}'
+                AND p.ordinal<=c.inherited_revision_count
+        """
+
+    def create_branch(self, child=None, parent=None, point=None, mode="after_revision"):
+        child = child or str(uuid.uuid7())
+        self.actor(
+            self.branch_sql(child, parent, point, mode)
+            + ";"
+            + self.snapshot_sql(child, parent)
+        )
+        return child
+
+    def visible(self, conversation):
+        return self.actor(f"""
+            SELECT ordinal,message_id,revision_id FROM archive.conversation_visible_revisions
+            WHERE conversation_id='{conversation}' ORDER BY ordinal
+        """).stdout.splitlines()
+
+
+@pytest.fixture(scope="module")
+def branch_database(tmp_path_factory):
+    stack = DatabaseStack(tmp_path_factory.mktemp("branch-database"), through_version=4)
+    try:
+        stack.start()
+        stack.migrate()
+        yield stack
+    finally:
+        stack.cleanup()
+
+
+@pytest.fixture
+def branch_rows(branch_database):
+    rows = BranchRows(branch_database)
+    rows.seed()
+    return rows
+
+
+@pytest.fixture
+def tracked_branch_rows(branch_rows):
+    # Test-only superuser configuration; transactions still use the actual API
+    # login and its unchanged grants. Transaction-local counters need no polling.
+    branch_rows.database.sql("ALTER ROLE mimir_api SET track_functions='pl'")
+    try:
+        yield branch_rows
+    finally:
+        branch_rows.database.sql("ALTER ROLE mimir_api RESET track_functions")
+
+
+@pytest.mark.parametrize("count", (1000, 2000, 5000))
+@pytest.mark.parametrize("nested", (False, True), ids=("root", "nested"))
+def test_t06_large_prefix_validated_once(tracked_branch_rows, count, nested):
+    rows = tracked_branch_rows
+    point = rows.seed_prefix(count)
+    expected = rows.visible(rows.conversation)
+    parent = rows.conversation
+    if nested:
+        parent = rows.create_branch(point=point)
+    child = str(uuid.uuid7())
+    started = time.monotonic()
+    result = rows.actor(
+        rows.branch_sql(child, parent=parent, point=point)
+        + ";"
+        + rows.snapshot_sql(child, parent=parent)
+        + ";"
+        + rows.validation_calls_sql()
+        + "; SET CONSTRAINTS ALL IMMEDIATE;"
+        + rows.validation_calls_sql()
+        + "; SET CONSTRAINTS ALL IMMEDIATE;"
+        + rows.validation_calls_sql()
+    )
+    elapsed = time.monotonic() - started  # Includes successful COMMIT, excludes seed.
+    print(f"T06 prefix={count} nested={nested} commit_seconds={elapsed:.3f}")
+    assert result.stdout.splitlines() == ["0", "1", "1"]
+    assert rows.visible(child) == expected
+
+
+def test_t06_split_inserts_and_multiple_branches_validate_once_each(
+    tracked_branch_rows,
+):
+    rows = tracked_branch_rows
+    point = rows.seed_prefix(3)
+    children = [str(uuid.uuid7()), str(uuid.uuid7())]
+    statements = []
+    for child in children:
+        statements.append(rows.branch_sql(child, point=point))
+        for ordinal in range(1, 4):
+            statements.append(rows.snapshot_sql(child) + f" AND p.ordinal={ordinal}")
+    statements.extend(
+        (
+            rows.validation_calls_sql(),
+            "SET CONSTRAINTS ALL IMMEDIATE",
+            rows.validation_calls_sql(),
+        )
+    )
+    assert rows.actor(";".join(statements)).stdout.splitlines() == ["0", "2"]
+    for child in children:
+        assert rows.visible(child) == rows.visible(rows.conversation)
+
+
+@pytest.mark.parametrize("complete", (False, True))
+def test_t06_explicit_constraint_check_preserves_completeness(branch_rows, complete):
+    rows = branch_rows
+    child = str(uuid.uuid7())
+    sql = rows.branch_sql(child)
+    if complete:
+        sql += ";" + rows.snapshot_sql(child)
+    result = rows.actor(sql + "; SET CONSTRAINTS ALL IMMEDIATE", check=False)
+    if complete:
+        assert result.returncode == 0
+        assert rows.visible(child) == rows.visible(rows.conversation)
+    else:
+        assert result.returncode != 0 and "dense exact parent prefix" in result.stderr
+        assert (
+            rows.actor(
+                f"SELECT count(*) FROM archive.conversations WHERE conversation_id='{child}'"
+            ).stdout.strip()
+            == "0"
+        )
+
+
+@pytest.mark.parametrize("empty", (False, True))
+@pytest.mark.parametrize("committed", (False, True))
+def test_t06_snapshot_cannot_extend_after_successful_validation(
+    branch_rows, empty, committed
+):
+    rows = branch_rows
+    child = str(uuid.uuid7())
+    create = (
+        rows.branch_sql(child, mode="replace_message" if empty else "after_revision")
+        + ";"
+        + rows.snapshot_sql(child)
+    )
+    point = rows.seed_prefix(2)
+    insert = f"""
+        INSERT INTO archive.conversation_branch_revisions
+            (user_id,conversation_id,ordinal,message_id,revision_id)
+        SELECT user_id,'{child}',{1 if empty else 2},message_id,revision_id
+        FROM archive.conversation_visible_revisions
+        WHERE conversation_id='{rows.conversation}' AND revision_id='{point}'
+    """
+    if committed:
+        rows.actor(create)
+        result = rows.actor(insert, check=False)
+    else:
+        result = rows.actor(
+            create + "; SET CONSTRAINTS ALL IMMEDIATE;" + insert, check=False
+        )
+    assert result.returncode != 0 and "dense exact parent prefix" in result.stderr
+    if committed:
+        assert rows.visible(child) == (
+            [] if empty else [f"1|{rows.message}|{rows.revision}"]
+        )
+    else:
+        assert (
+            rows.actor(
+                f"SELECT count(*) FROM archive.conversations WHERE conversation_id='{child}'"
+            ).stdout.strip()
+            == "0"
+        )
+
+
+def test_t06_fresh_repeat_validate_restart_and_catalog(branch_rows):
+    rows = branch_rows
+    child = rows.create_branch()
+    database = rows.database
+    history_sql = "SELECT version,checksum,success FROM public.flyway_schema_history ORDER BY installed_rank"
+    history = database.sql(history_sql).stdout
+    assert [line.split("|")[0] for line in history.splitlines()] == [
+        "001",
+        "002",
+        "003",
+        "004",
+    ]
+    assert database.sql("SHOW server_version_num").stdout.startswith("18")
+    database.migrate()
+    database.flyway("validate")
+    database.compose("restart", "postgres")
+    database.compose("up", "-d", "--wait", "postgres")
+    database.flyway("validate")
+    assert database.sql(history_sql).stdout == history
+    assert rows.visible(child) == [f"1|{rows.message}|{rows.revision}"]
+    assert (
+        database.sql("""
+        SELECT pg_get_userbyid(relowner),relrowsecurity,relforcerowsecurity
+        FROM pg_class WHERE oid='archive.conversation_branch_revisions'::regclass
+    """).stdout.strip()
+        == "mimir_owner|t|t"
+    )
+    assert database.sql("""
+        SELECT tgname,tgdeferrable,tginitdeferred FROM pg_trigger
+        WHERE tgname IN ('branch_snapshot_required','branch_revision_insert_guard',
+            'branch_snapshot_exact') ORDER BY tgname
+    """).stdout.splitlines() == [
+        "branch_revision_insert_guard|f|f",
+        "branch_snapshot_required|t|t",
+    ]
+    assert (
+        database.sql("""
+        SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='archive' AND (pg_get_userbyid(p.proowner)<>'mimir_owner' OR
+            EXISTS (SELECT FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+                WHERE a.grantee=0 AND a.privilege_type='EXECUTE'))
+    """).stdout.strip()
+        == "0"
+    )
+
+
+def test_t06_upgrade_rollback_recovery_and_drift(tmp_path):
+    database = DatabaseStack(tmp_path, through_version=3)
+    try:
+        database.start()
+        database.migrate()
+        rows = BranchRows(database)
+        rows.seed()
+        history_sql = "SELECT version,checksum FROM public.flyway_schema_history ORDER BY installed_rank"
+        history = database.sql(history_sql).stdout
+        candidate = database.migrations / V004
+        original = (ROOT / "backend/migrations" / V004).read_bytes()
+        candidate.write_bytes(original + b"\nSELECT 1/0;\n")
+        assert database.flyway("migrate", check=False).returncode != 0
+        assert database.sql(history_sql).stdout == history
+        assert (
+            database.sql("""
+            SELECT to_regclass('archive.conversation_branch_revisions') IS NULL,
+                to_regclass('archive.conversation_visible_revisions') IS NULL,
+                to_regprocedure('archive.prepare_branch_link()') IS NULL
+        """).stdout.strip()
+            == "t|t|t"
+        )
+        assert (
+            database.sql("""
+            SELECT count(*) FROM information_schema.columns WHERE table_schema='archive'
+                AND table_name='conversations' AND column_name='parent_conversation_id'
+        """).stdout.strip()
+            == "0"
+        )
+        candidate.write_bytes(original)
+        database.flyway("migrate")
+        database.flyway("validate")
+        assert database.sql(history_sql + " LIMIT 3").stdout == history
+        assert rows.visible(rows.conversation) == [f"1|{rows.message}|{rows.revision}"]
+        rows.create_branch()
+        try:
+            candidate.write_bytes(original + b"\nSELECT 12345;\n")
+            failed = database.flyway("validate", check=False)
+            assert (
+                failed.returncode != 0
+                and "checksum" in (failed.stdout + failed.stderr).lower()
+            )
+            assert database.flyway("migrate", check=False).returncode != 0
+        finally:
+            candidate.write_bytes(original)
+        database.flyway("validate")
+    finally:
+        database.cleanup()
+
+
+@pytest.mark.parametrize("mode", ("after_revision", "replace_message"))
+def test_t06_nested_flattened_prefix_and_local_ordinals(branch_rows, mode):
+    rows = branch_rows
+    second_message, second_revision = str(uuid.uuid7()), str(uuid.uuid7())
+    rows.actor(rows.message_sql(2, second_message, second_revision))
+    parent_history = rows.visible(rows.conversation)
+    child = rows.create_branch(point=second_revision, mode=mode)
+    length = 2 if mode == "after_revision" else 1
+    assert rows.visible(child) == parent_history[:length]
+    # Append new local content at local ordinal one, after inherited history.
+    root = rows.conversation
+    rows.conversation = child
+    local_message, local_revision = str(uuid.uuid7()), str(uuid.uuid7())
+    rows.actor(rows.message_sql(1, local_message, local_revision))
+    grandchild = rows.create_branch(point=local_revision)
+    assert rows.visible(grandchild) == parent_history[:length] + [
+        f"{length + 1}|{local_message}|{local_revision}"
+    ]
+    # Branch from an inherited point in a nested parent, excluding later history.
+    nested = rows.create_branch(parent=grandchild, point=rows.revision)
+    assert rows.visible(nested) == parent_history[:1]
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.messages WHERE conversation_id='{grandchild}'"
+        ).stdout.strip()
+        == "0"
+    )
+    rows.conversation = root
+    rows.actor(rows.message_sql(3))
+    extra_revision = str(uuid.uuid7())
+    rows.actor(f"""
+        INSERT INTO archive.message_revisions(revision_id,user_id,message_id,revision_number,content_text)
+        VALUES ('{extra_revision}','{rows.user}','{rows.message}',2,'synthetic later revision')
+    """)
+    for sql in (
+        f"UPDATE archive.message_revisions SET content_text='changed' WHERE revision_id='{rows.revision}'",
+        f"UPDATE archive.messages SET current_revision_id='{extra_revision}' WHERE message_id='{rows.message}'",
+    ):
+        assert rows.owner(sql, check=False).returncode != 0
+    assert rows.visible(nested) == parent_history[:1]
+    assert rows.visible(grandchild) == parent_history[:length] + [
+        f"{length + 1}|{local_message}|{local_revision}"
+    ]
+    # Parent and child project association become independent after creation.
+    rows.actor(
+        f"UPDATE archive.conversations SET project_id=NULL,conversation_version=2 WHERE conversation_id='{root}'"
+    )
+    assert (
+        rows.actor(
+            f"SELECT project_id FROM archive.conversations WHERE conversation_id='{child}'"
+        ).stdout.strip()
+        == rows.project
+    )
+
+
+def test_t06_replace_first_revision_has_empty_prefix(branch_rows):
+    rows = branch_rows
+    child = rows.create_branch(mode="replace_message")
+    assert rows.visible(child) == []
+    assert (
+        rows.actor(
+            f"SELECT inherited_revision_count FROM archive.conversations WHERE conversation_id='{child}'"
+        ).stdout.strip()
+        == "0"
+    )
+
+
+@pytest.mark.parametrize(
+    "context",
+    (
+        "RESET app.current_user_id",
+        "SET LOCAL app.current_user_id='00000000-0000-0000-0000-000000000001'",
+    ),
+)
+def test_t06_complete_snapshot_survives_actor_change_and_savepoint_recovery(
+    branch_rows, context
+):
+    rows = branch_rows
+    child = str(uuid.uuid7())
+    rows.actor(rows.branch_sql(child) + ";" + rows.snapshot_sql(child) + ";" + context)
+    assert rows.visible(child) == [f"1|{rows.message}|{rows.revision}"]
+    # A rolled-back attempted branch leaves no rows and does not consume ordinals.
+    aborted = str(uuid.uuid7())
+    rows.actor(
+        "SAVEPOINT branch_attempt;"
+        + rows.branch_sql(aborted)
+        + ";"
+        + rows.snapshot_sql(aborted)
+        + "; ROLLBACK TO SAVEPOINT branch_attempt"
+    )
+    assert rows.visible(aborted) == []
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.conversations WHERE conversation_id='{aborted}'"
+        ).stdout.strip()
+        == "0"
+    )
+    rows.create_branch(child=aborted)
+    assert rows.visible(aborted) == rows.visible(child)
+
+
+@pytest.mark.parametrize("ordinal", (0, -1, 1))
+def test_t06_snapshot_ordinal_boundaries_and_duplicate_rejected(branch_rows, ordinal):
+    rows = branch_rows
+    child = rows.create_branch()
+    failed = rows.actor(
+        f"INSERT INTO archive.conversation_branch_revisions VALUES ('{rows.user}','{child}',{ordinal},'{rows.message}','{rows.revision}')",
+        check=False,
+    )
+    assert failed.returncode != 0
+    assert (
+        "check constraint" in failed.stderr
+        if ordinal <= 0
+        else "duplicate key" in failed.stderr
+    )
+
+
+def test_t06_incomplete_branch_and_missing_actor_fail_closed(branch_rows):
+    rows = branch_rows
+    child = str(uuid.uuid7())
+    failed = rows.actor(rows.branch_sql(child), check=False)
+    assert failed.returncode != 0 and "dense exact parent prefix" in failed.stderr
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.conversations WHERE conversation_id='{child}'"
+        ).stdout.strip()
+        == "0"
+    )
+    failed = rows.database.sql(
+        f"INSERT INTO archive.conversations(conversation_id,user_id,title) VALUES ('{child}','{rows.user}','synthetic')",
+        "mimir_api",
+        check=False,
+    )
+    assert failed.returncode != 0 and "row-level security" in failed.stderr
+
+
+@pytest.mark.parametrize(
+    "fault", ("missing", "gap", "swapped", "wrong_revision", "extra", "root")
+)
+@pytest.mark.parametrize("clear_actor", (False, True))
+def test_t06_malformed_snapshot_rejected_and_rolled_back(
+    branch_rows, fault, clear_actor
+):
+    rows = branch_rows
+    rows.actor(rows.message_sql(2))
+    point = rows.actor(
+        f"SELECT revision_id FROM archive.conversation_visible_revisions WHERE conversation_id='{rows.conversation}' AND ordinal=2"
+    ).stdout.strip()
+    extra_revision = str(uuid.uuid7())
+    rows.actor(
+        f"INSERT INTO archive.message_revisions(revision_id,user_id,message_id,revision_number,content_text) VALUES ('{extra_revision}','{rows.user}','{rows.message}',2,'synthetic')"
+    )
+    child = str(uuid.uuid7())
+    create = rows.branch_sql(child, point=point)
+    select_sql = f"SELECT user_id,'{child}',ordinal,message_id,revision_id FROM archive.conversation_visible_revisions WHERE conversation_id='{rows.conversation}'"
+    if fault == "missing":
+        select_sql += " AND ordinal=1"
+    elif fault == "gap":
+        select_sql = select_sql.replace(",ordinal,", ",ordinal+1,")
+    elif fault == "swapped":
+        select_sql = select_sql.replace(",ordinal,", ",3-ordinal,")
+    elif fault == "wrong_revision":
+        select_sql = select_sql.replace(
+            ",revision_id FROM",
+            f",CASE WHEN ordinal=1 THEN '{extra_revision}'::uuid ELSE revision_id END FROM",
+        )
+    elif fault == "extra":
+        create = rows.branch_sql(child)  # boundary one, snapshot two
+    else:
+        create = f"INSERT INTO archive.conversations(conversation_id,user_id,title) VALUES ('{child}','{rows.user}','synthetic root')"
+    result = rows.actor(
+        create
+        + "; INSERT INTO archive.conversation_branch_revisions(user_id,conversation_id,ordinal,message_id,revision_id) "
+        + select_sql
+        + "; SELECT 'reference_inserts_finished'"
+        + ("; RESET app.current_user_id" if clear_actor else ""),
+        check=False,
+    )
+    assert result.returncode != 0 and "dense exact parent prefix" in result.stderr
+    # Missing/substituted/reordered content fails at the deferred commit guard;
+    # an upper-bound violation must fail immediately before this marker.
+    assert ("reference_inserts_finished" in result.stdout) == (
+        fault in ("missing", "swapped", "wrong_revision")
+    )
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.conversations WHERE conversation_id='{child}'"
+        ).stdout.strip()
+        == "0"
+    )
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.conversation_branch_revisions WHERE conversation_id='{child}'"
+        ).stdout.strip()
+        == "0"
+    )
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "unselected",
+        "unrelated",
+        "foreign_parent",
+        "foreign_point",
+        "project",
+        "self",
+        "mode",
+    ),
+)
+def test_t06_invalid_linkage_and_cross_owner_foreign_keys(branch_rows, fault):
+    rows = branch_rows
+    other = BranchRows(rows.database)
+    other.seed()
+    child = str(uuid.uuid7())
+    sql = rows.branch_sql(child)
+    if fault == "unselected":
+        point = str(uuid.uuid7())
+        rows.actor(
+            f"INSERT INTO archive.message_revisions(revision_id,user_id,message_id,revision_number,content_text) VALUES ('{point}','{rows.user}','{rows.message}',2,'synthetic')"
+        )
+        sql = rows.branch_sql(child, point=point)
+    elif fault == "unrelated":
+        sibling = rows.create_branch(mode="replace_message")
+        root = rows.conversation
+        rows.conversation = sibling
+        point = str(uuid.uuid7())
+        rows.actor(rows.message_sql(1, revision=point))
+        rows.conversation = root
+        sql = rows.branch_sql(child, point=point)
+    elif fault == "foreign_parent":
+        # Direct VALUES avoids an RLS-filtered INSERT SELECT silently inserting zero rows.
+        sql = f"INSERT INTO archive.conversations(conversation_id,user_id,title,parent_conversation_id,branch_point_revision_id,branch_mode) VALUES ('{child}','{rows.user}','synthetic','{other.conversation}','{other.revision}','after_revision')"
+    elif fault == "foreign_point":
+        sql = rows.branch_sql(child, point=other.revision)
+    elif fault == "project":
+        sql = sql.replace("project_id,'synthetic branch'", "NULL,'synthetic branch'")
+    elif fault == "self":
+        sql = sql.replace(
+            f"'{rows.conversation}','{rows.revision}'", f"'{child}','{rows.revision}'"
+        )
+    else:
+        sql = rows.branch_sql(child, mode="unknown")
+    assert rows.actor(sql, check=False).returncode != 0
+    child = rows.create_branch()
+    # Composite owner FK rejects a same-owner message paired with a foreign revision.
+    assert (
+        rows.owner(
+            f"INSERT INTO archive.conversation_branch_revisions VALUES ('{rows.user}','{child}',2,'{rows.message}','{other.revision}')",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.owner(
+            f"INSERT INTO archive.conversation_branch_revisions VALUES ('{other.user}','{child}',2,'{other.message}','{other.revision}')",
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+@pytest.mark.parametrize("role", RUNTIME)
+def test_t06_runtime_privileges_rls_and_view_scope(branch_rows, role):
+    rows = branch_rows
+    child = rows.create_branch()
+    for statement in (
+        f"UPDATE archive.conversation_branch_revisions SET ordinal=2 WHERE conversation_id='{child}'",
+        f"DELETE FROM archive.conversation_branch_revisions WHERE conversation_id='{child}'",
+        "TRUNCATE archive.conversation_branch_revisions",
+        "SELECT archive.require_exact_branch_snapshot()",
+        f"UPDATE archive.conversations SET parent_conversation_id=NULL WHERE conversation_id='{child}'",
+    ):
+        assert rows.actor(statement, role=role, check=False).returncode != 0
+    if role in ("auth", "maintenance"):
+        assert (
+            rows.actor(
+                "SELECT * FROM archive.conversation_visible_revisions",
+                role=role,
+                check=False,
+            ).returncode
+            != 0
+        )
+        return
+    other = BranchRows(rows.database)
+    other.seed()
+    for end in ("COMMIT", "ROLLBACK"):
+        result = rows.database.sql(
+            f"""
+            BEGIN; SET LOCAL app.current_user_id='{rows.user}';
+            SELECT count(*) FROM archive.conversation_branch_revisions;
+            SELECT count(*) FROM archive.conversation_visible_revisions WHERE user_id<>'{rows.user}';
+            {end};
+            SELECT count(*) FROM archive.conversation_branch_revisions;
+            SELECT count(*) FROM archive.conversation_visible_revisions;
+        """,
+            f"mimir_{role}",
+        )
+        assert result.stdout.splitlines() == ["1", "0", "0", "0"]
+    assert (
+        rows.actor(
+            "SET LOCAL row_security=off; SELECT * FROM archive.conversation_branch_revisions",
+            role=role,
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.actor(
+            "SET LOCAL app.current_user_id='malformed'; SELECT * FROM archive.conversation_visible_revisions",
+            role=role,
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.actor(
+            f"INSERT INTO archive.conversation_branch_revisions VALUES ('{other.user}','{child}',2,'{other.message}','{other.revision}')",
+            role=role,
+            check=False,
+        ).returncode
+        != 0
+    )
+    if role == "worker":
+        assert (
+            rows.actor(
+                rows.branch_sql(str(uuid.uuid7())), role=role, check=False
+            ).returncode
+            != 0
+        )
+
+
+def test_t06_committed_snapshot_and_linkage_are_immutable(branch_rows):
+    rows = branch_rows
+    child = rows.create_branch()
+    for assignment in (
+        "parent_conversation_id=NULL",
+        "branch_point_revision_id=NULL",
+        "branch_mode='replace_message'",
+        "inherited_revision_count=0",
+    ):
+        result = rows.owner(
+            f"UPDATE archive.conversations SET {assignment} WHERE conversation_id='{child}'",
+            check=False,
+        )
+        assert result.returncode != 0 and "immutable" in result.stderr
+    assert (
+        rows.owner(
+            f"UPDATE archive.conversation_branch_revisions SET ordinal=ordinal WHERE conversation_id='{child}'",
+            check=False,
+        ).returncode
+        != 0
+    )
+    rows.actor(rows.message_sql())
+    # Adding valid later parent history to an already committed child is forbidden.
+    assert (
+        rows.actor(
+            f"INSERT INTO archive.conversation_branch_revisions SELECT user_id,'{child}',ordinal,message_id,revision_id FROM archive.conversation_visible_revisions WHERE conversation_id='{rows.conversation}' AND ordinal=2",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.owner(
+            f"DELETE FROM archive.conversations WHERE conversation_id='{rows.conversation}'",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.owner(
+            f"DELETE FROM archive.message_revisions WHERE revision_id='{rows.revision}'",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert rows.visible(child) == [f"1|{rows.message}|{rows.revision}"]
+
+
+def test_t06_competing_branches_and_parent_appends(branch_rows):
+    rows = branch_rows
+    barrier = threading.Barrier(3)
+    children = [str(uuid.uuid7()), str(uuid.uuid7())]
+
+    def execute(sql):
+        barrier.wait(timeout=15)
+        return rows.actor(sql)
+
+    statements = [
+        rows.branch_sql(child) + ";" + rows.snapshot_sql(child) for child in children
+    ]
+    statements.append(rows.message_sql())
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        results = list(pool.map(execute, statements))
+    assert all(result.returncode == 0 for result in results)
+    for child in children:
+        assert rows.visible(child) == [f"1|{rows.message}|{rows.revision}"]
+    assert len(rows.visible(rows.conversation)) == 2
+
+
+def test_t06_branch_and_parent_delete_preserve_foreign_keys(branch_rows):
+    rows = branch_rows
+    child = str(uuid.uuid7())
+    barrier = threading.Barrier(2)
+
+    def branch():
+        barrier.wait(timeout=15)
+        return rows.actor(
+            rows.branch_sql(child) + ";" + rows.snapshot_sql(child), check=False
+        )
+
+    def delete():
+        barrier.wait(timeout=15)
+        return rows.owner(
+            # Storage-only candidate purge, under the privileged test owner.
+            # Removing all source rows avoids relying on pre-existing message
+            # FKs to make every deletion fail regardless of the branch race.
+            f"""
+                SELECT 1 FROM archive.conversations
+                    WHERE conversation_id='{rows.conversation}' FOR UPDATE;
+                DELETE FROM archive.message_revisions WHERE message_id='{rows.message}';
+                DELETE FROM archive.messages WHERE message_id='{rows.message}';
+                DELETE FROM archive.conversations WHERE conversation_id='{rows.conversation}'
+            """,
+            check=False,
+        )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        created = pool.submit(branch)
+        deleted = pool.submit(delete)
+        branch_result, purge_result = created.result(), deleted.result()
+    remaining = rows.actor(
+        f"SELECT count(*) FROM archive.conversations WHERE conversation_id IN ('{child}','{rows.conversation}')"
+    ).stdout.strip()
+    if purge_result.returncode == 0:
+        assert remaining == "0"
+        assert rows.visible(child) == []
+    else:
+        assert branch_result.returncode == 0
+        assert remaining == "2"
+        assert rows.visible(child) == [f"1|{rows.message}|{rows.revision}"]
