@@ -280,10 +280,16 @@ jobs. Auth/maintenance have no direct runtime table access. No runtime role gets
 direct writes to deletion controls. Restricted cross-user discovery, purge and
 cleanup interfaces belong to later tasks, not an RLS bypass in V005.
 
-Standalone input has only an opaque ciphertext/key-reference slot. T21 owns its
-encryption boundary/key management and input retention; this migration supplies
-no encryption implementation. Completed standalone results expire exactly 168
-hours after completion. Expired result/input/checkpoint erasure can preserve run
+Standalone input is temporary `input_text`, limited to 1 MiB UTF-8 and permitted
+only on standalone runs. It is protected by forced tenant RLS and explicit table
+privileges; API/worker roles cannot rewrite it. Per approved architecture section
+10, encryption at rest is provided by encrypted host volumes and backups, without
+application field-level encryption or application-managed input keys. This
+schema/test suite does not provision or verify host/backup encryption. Prompts
+must remain absent from logs, diagnostics and operation lookup responses.
+T21/T23 own bounded input retention and cleanup services; no new input TTL is
+selected here. Completed standalone results expire exactly 168 hours after
+completion. Expired result/input/checkpoint erasure can preserve run
 and ledger identity through an artifact-purge marker; only privileged schema
 tests can exercise that shape today. No runtime cleanup privilege or worker is
 installed. Unsuccessful checkpoint retention and explicit inference retry remain
@@ -315,3 +321,12 @@ forward SQL or a coordinated offline restore of compatible archive/provider
 stores with independent deletion-journal replay before reopening (T37). Never
 edit applied SQL, run Flyway clean/repair/baseline/out-of-order migration, or
 delete retained volumes. V005 installs no down migration or destructive recovery.
+
+PR #9 review R1 corrects the candidate standalone-input storage contract to the
+approved host-volume/backup encryption baseline. The owner approved this plan;
+the local Docker container/volume inventories were empty before correction, and
+recorded V005 applications were in disposable test stacks. Only the unmerged
+candidate is revised. Recreate owned disposable stacks from the corrected SQL;
+never repair an old candidate checksum for reuse. If V005 has been applied to a
+retained database, preserve its migration history and obtain separate approval
+for a forward migration instead of applying this revised candidate over it.

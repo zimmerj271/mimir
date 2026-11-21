@@ -23,10 +23,10 @@ CREATE TABLE runtime.model_runs (
     checkpoint_text text NOT NULL DEFAULT '',
     checkpoint_sequence bigint NOT NULL DEFAULT 0 CHECK (checkpoint_sequence >= 0),
     final_text text CHECK (octet_length(convert_to(final_text, 'UTF8')) <= 1048576),
-    -- Standalone input is an opaque encrypted artifact, never an archive message.
-    -- Key management/encoding and purge are T21; schema supplies no plaintext slot.
-    input_ciphertext bytea,
-    input_key_id text,
+    -- Temporary standalone prompt, never an archive message or diagnostic.
+    -- Architecture section 10 uses encrypted host volumes/backups, without
+    -- application field encryption. T21/T23 own input retention and cleanup.
+    input_text text CHECK (octet_length(convert_to(input_text, 'UTF8')) <= 1048576),
     error_code text,
     execution_token uuid,
     execution_generation bigint NOT NULL DEFAULT 0 CHECK (execution_generation >= 0),
@@ -42,12 +42,10 @@ CREATE TABLE runtime.model_runs (
     FOREIGN KEY (user_id, input_message_id) REFERENCES archive.messages (user_id, message_id),
     FOREIGN KEY (user_id, assistant_message_id) REFERENCES archive.messages (user_id, message_id),
     CHECK ((kind = 'conversation' AND conversation_id IS NOT NULL AND input_message_id IS NOT NULL
-            AND input_ciphertext IS NULL AND input_key_id IS NULL AND final_text IS NULL
+            AND input_text IS NULL AND final_text IS NULL
             AND result_expires_at IS NULL)
         OR (kind = 'standalone' AND conversation_id IS NULL AND input_message_id IS NULL
             AND assistant_message_id IS NULL)),
-    CHECK ((input_ciphertext IS NULL) = (input_key_id IS NULL)),
-    CHECK (input_key_id IS NULL OR input_key_id <> ''),
     CHECK ((status IN ('pending','running')) = (completed_at IS NULL)),
     CHECK (started_at IS NULL OR completed_at IS NULL OR completed_at >= started_at),
     CHECK ((status = 'running' AND execution_token IS NOT NULL AND execution_generation > 0
@@ -62,7 +60,7 @@ CREATE TABLE runtime.model_runs (
         OR (NOT (kind = 'standalone' AND status = 'completed') AND result_expires_at IS NULL)),
     CHECK (artifacts_purged_at IS NULL OR (kind='standalone' AND status='completed'
         AND artifacts_purged_at >= result_expires_at AND final_text IS NULL
-        AND input_ciphertext IS NULL AND input_key_id IS NULL
+        AND input_text IS NULL
         AND checkpoint_text='' AND checkpoint_sequence=0))
 );
 CREATE UNIQUE INDEX model_runs_one_active_conversation
@@ -260,9 +258,9 @@ BEGIN
                     OLD.artifacts_purged_at IS NULL AND NEW.artifacts_purged_at IS NOT NULL
                     AND NEW.artifacts_purged_at <= clock_timestamp()
                     AND (to_jsonb(NEW) - ARRAY['artifacts_purged_at','final_text',
-                        'input_ciphertext','input_key_id','checkpoint_text','checkpoint_sequence'])
+                        'input_text','checkpoint_text','checkpoint_sequence'])
                         = (to_jsonb(OLD) - ARRAY['artifacts_purged_at','final_text',
-                        'input_ciphertext','input_key_id','checkpoint_text','checkpoint_sequence'])))
+                        'input_text','checkpoint_text','checkpoint_sequence'])))
             OR (NEW.checkpoint_sequence < OLD.checkpoint_sequence AND NEW.artifacts_purged_at IS NULL)
             OR (NEW.checkpoint_text IS DISTINCT FROM OLD.checkpoint_text
                 AND NEW.checkpoint_sequence <= OLD.checkpoint_sequence AND NEW.artifacts_purged_at IS NULL)

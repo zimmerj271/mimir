@@ -3110,7 +3110,7 @@ def test_t07_active_run_uniqueness_competing_transactions(runtime_rows):
     )
 
 
-def test_t07_standalone_parallel_runs_and_encrypted_input(runtime_rows):
+def test_t07_standalone_parallel_runs_and_protected_input(runtime_rows):
     rows = runtime_rows
     before = rows.actor(
         "SELECT count(*) FROM archive.messages; SELECT count(*) FROM archive.conversations"
@@ -3120,11 +3120,17 @@ def test_t07_standalone_parallel_runs_and_encrypted_input(runtime_rows):
         rows.run_sql(
             standalone,
             "standalone",
-            ",input_ciphertext,input_key_id",
-            ",decode('aabb','hex'),'synthetic-key'",
+            ",input_text",
+            ",'synthetic prompt'",
         )
         + ";"
         + rows.run_sql(str(uuid.uuid7()), "standalone")
+    )
+    assert (
+        rows.actor(
+            f"SELECT input_text='synthetic prompt' FROM runtime.model_runs WHERE run_id='{standalone}'"
+        ).stdout.strip()
+        == "t"
     )
     rows.actor(rows.running_sql(standalone), role="worker")
     # Use one timestamp for exact completed_at/expiry, as a future finalizer must.
@@ -3154,6 +3160,62 @@ def test_t07_standalone_parallel_runs_and_encrypted_input(runtime_rows):
     )
 
 
+@pytest.mark.parametrize("characters,accepted", ((524288, True), (524289, False)))
+def test_t07_standalone_input_utf8_limit(runtime_rows, characters, accepted):
+    rows = runtime_rows
+    run = str(uuid.uuid7())
+    result = rows.actor(
+        rows.run_sql(run, "standalone", ",input_text", f",repeat('é',{characters})"),
+        check=False,
+    )
+    assert (result.returncode == 0) is accepted
+    if accepted:
+        assert (
+            rows.actor(
+                f"SELECT octet_length(convert_to(input_text,'UTF8')) FROM runtime.model_runs WHERE run_id='{run}'"
+            ).stdout.strip()
+            == "1048576"
+        )
+    else:
+        assert (
+            rows.actor(
+                f"SELECT count(*) FROM runtime.model_runs WHERE run_id='{run}'"
+            ).stdout.strip()
+            == "0"
+        )
+
+
+@pytest.mark.parametrize("role", ("api", "worker"))
+def test_t07_standalone_input_scope_and_runtime_write_denial(runtime_rows, role):
+    rows = runtime_rows
+    run = str(uuid.uuid7())
+    rows.actor(rows.run_sql(run, "standalone", ",input_text", ",'synthetic prompt'"))
+    other = RuntimeRows(rows.database)
+    other.seed()
+    query = f"SELECT count(*) FROM runtime.model_runs WHERE run_id='{run}' AND input_text IS NOT NULL"
+    assert rows.actor(query, role=role).stdout.strip() == "1"
+    assert other.actor(query, role=role).stdout.strip() == "0"
+    # Reuse the same real connection across COMMIT; no prompt text is emitted.
+    assert rows.database.sql(
+        f"BEGIN; SET LOCAL app.current_user_id='{rows.user}'; {query}; COMMIT; {query}",
+        f"mimir_{role}",
+    ).stdout.splitlines() == ["1", "0"]
+    assert (
+        rows.actor(
+            f"UPDATE runtime.model_runs SET input_text='changed' WHERE run_id='{run}'",
+            role=role,
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert rows.database.sql("""
+        SELECT column_name,data_type FROM information_schema.columns
+        WHERE table_schema='runtime' AND table_name='model_runs'
+            AND column_name IN ('input_text','input_ciphertext','input_key_id')
+        ORDER BY column_name
+    """).stdout.splitlines() == ["input_text|text"]
+
+
 @pytest.mark.parametrize(
     "fault",
     (
@@ -3162,7 +3224,7 @@ def test_t07_standalone_parallel_runs_and_encrypted_input(runtime_rows):
         "standalone_conversation",
         "wrong_conversation",
         "assistant_input",
-        "plaintext_pair",
+        "standalone_input_on_conversation",
         "initial_terminal",
     ),
 )
@@ -3186,9 +3248,11 @@ def test_t07_invalid_run_shapes_and_message_roles(runtime_rows, fault):
         message = str(uuid.uuid7())
         rows.actor(rows.message_sql(2, message=message, role="assistant"))
         sql = sql.replace(f"'{rows.message}'", f"'{message}'")
-    elif fault == "plaintext_pair":
+    elif fault == "standalone_input_on_conversation":
         sql = rows.run_sql(
-            str(uuid.uuid7()), "standalone", ",input_key_id", ",'missing-ciphertext'"
+            str(uuid.uuid7()),
+            extra_columns=",input_text",
+            extra_values=",'synthetic prompt'",
         )
     else:
         sql = rows.run_sql(
@@ -3655,8 +3719,8 @@ def test_t07_standalone_expiry_preserves_ledger_identity_and_fails_closed(runtim
         rows.run_sql(
             run,
             "standalone",
-            ",created_at,input_ciphertext,input_key_id",
-            ",CURRENT_TIMESTAMP-interval '9 days',decode('aabb','hex'),'synthetic-key'",
+            ",created_at,input_text",
+            ",CURRENT_TIMESTAMP-interval '9 days','synthetic prompt'",
         )
     )
     rows.actor(rows.operation_sql(run=run, kind="standalone_submit"))
@@ -3671,14 +3735,17 @@ def test_t07_standalone_expiry_preserves_ledger_identity_and_fails_closed(runtim
     )
     purge = f"""
         UPDATE runtime.model_runs SET artifacts_purged_at=CURRENT_TIMESTAMP,
-            input_ciphertext=NULL,input_key_id=NULL,checkpoint_text='',checkpoint_sequence=0,
+            input_text=NULL,checkpoint_text='',checkpoint_sequence=0,
             final_text=NULL WHERE run_id='{run}'
     """
     assert rows.actor(purge, role="worker", check=False).returncode != 0
+    assert (
+        rows.owner(purge.replace("input_text=NULL,", ""), check=False).returncode != 0
+    )
     rows.owner(purge)
     assert (
         rows.actor(
-            f"SELECT run_id,status,final_text IS NULL,input_ciphertext IS NULL FROM runtime.model_runs WHERE run_id='{run}'"
+            f"SELECT run_id,status,final_text IS NULL,input_text IS NULL FROM runtime.model_runs WHERE run_id='{run}'"
         ).stdout.strip()
         == f"{run}|completed|t|t"
     )
