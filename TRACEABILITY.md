@@ -31,6 +31,15 @@ runtime atomicity, governed subtree purge, memory behavior and complete V001–V
 acceptance remain successor work. Normative ownership/status are unchanged;
 actual commands/results and submitted SHA belong to the T06 PR.
 
+T06 review R1 supporting reliability coverage additionally exercises 1,000,
+2,000 and 5,000 inherited references from root/nested parents. Transaction-local
+PostgreSQL function counters require exactly one full-prefix validator call per
+created conversation, including split inserts and multiple branches. Immediate
+bounds and deferred exact-prefix failure timing, explicit constraint checks and
+attempted extension of empty/complete snapshots preserve DB-04 storage integrity.
+Actual timings and revised candidate V004 checksum belong to PR #8; no release
+latency target or broader service/runtime acceptance is implied.
+
 T05 supporting archive-local coverage → `tests/integration/test_database.py`
 (`test_t05_*`), real PostgreSQL 18/Flyway. The suite covers V003 fresh/repeat/restart,
 V002 upgrade rollback/recovery and drift, atomic message/revision pairs, mandatory

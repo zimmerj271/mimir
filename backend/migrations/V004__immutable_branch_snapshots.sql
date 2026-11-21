@@ -117,6 +117,28 @@ BEGIN
 END
 $function$;
 
+CREATE FUNCTION archive.guard_branch_revision_insert() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp
+AS $function$
+DECLARE
+    prefix_length bigint;
+BEGIN
+    SELECT inherited_revision_count INTO prefix_length FROM archive.conversations
+        WHERE user_id = NEW.user_id AND conversation_id = NEW.conversation_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'snapshot requires an owned conversation' USING ERRCODE = '23503';
+    END IF;
+    -- Positive ordinals and uniqueness are existing table constraints. Once the
+    -- complete prefix occupies 1..K, these bounds forbid all later extensions.
+    -- No count or parent-prefix scan belongs in this per-reference guard.
+    IF NEW.ordinal > prefix_length THEN
+        RAISE EXCEPTION 'branch snapshot must equal the dense exact parent prefix'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END
+$function$;
+
 CREATE FUNCTION archive.require_exact_branch_snapshot() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
@@ -135,15 +157,17 @@ BEGIN
     IF (SELECT count(*) FROM archive.conversation_branch_revisions
         WHERE user_id = branch.user_id AND conversation_id = branch.conversation_id)
             <> branch.inherited_revision_count
+        -- Bounds plus positive unique ordinals and count K establish density.
+        -- Compare both sets once rather than looking up parent history N times.
         OR EXISTS (
-            SELECT FROM archive.conversation_branch_revisions s
-            WHERE s.user_id = branch.user_id AND s.conversation_id = branch.conversation_id
-                AND (s.ordinal > branch.inherited_revision_count OR NOT EXISTS (
-                    SELECT FROM archive.conversation_visible_revisions p
-                    WHERE p.user_id = branch.user_id
-                        AND p.conversation_id = branch.parent_conversation_id
-                        AND p.ordinal = s.ordinal AND p.message_id = s.message_id
-                        AND p.revision_id = s.revision_id))) THEN
+            (SELECT ordinal, message_id, revision_id
+                FROM archive.conversation_branch_revisions
+                WHERE user_id = branch.user_id AND conversation_id = branch.conversation_id)
+            EXCEPT
+            (SELECT ordinal, message_id, revision_id FROM archive.conversation_visible_revisions
+                WHERE user_id = branch.user_id
+                    AND conversation_id = branch.parent_conversation_id
+                    AND ordinal <= branch.inherited_revision_count)) THEN
         RAISE EXCEPTION 'branch snapshot must equal the dense exact parent prefix'
             USING ERRCODE = '23514';
     END IF;
@@ -157,10 +181,9 @@ CREATE TRIGGER branch_link_update_guard BEFORE UPDATE ON archive.conversations
     FOR EACH ROW EXECUTE FUNCTION archive.guard_branch_link_update();
 CREATE TRIGGER branch_revision_update_guard BEFORE UPDATE ON archive.conversation_branch_revisions
     FOR EACH ROW EXECUTE FUNCTION archive.reject_branch_revision_update();
+CREATE TRIGGER branch_revision_insert_guard BEFORE INSERT ON archive.conversation_branch_revisions
+    FOR EACH ROW EXECUTE FUNCTION archive.guard_branch_revision_insert();
 CREATE CONSTRAINT TRIGGER branch_snapshot_required AFTER INSERT ON archive.conversations
-    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
-    EXECUTE FUNCTION archive.require_exact_branch_snapshot();
-CREATE CONSTRAINT TRIGGER branch_snapshot_exact AFTER INSERT ON archive.conversation_branch_revisions
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
     EXECUTE FUNCTION archive.require_exact_branch_snapshot();
 

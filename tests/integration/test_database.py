@@ -2136,6 +2136,21 @@ V004 = "V004__immutable_branch_snapshots.sql"
 
 
 class BranchRows(ArchiveRows):
+    def seed_prefix(self, count):
+        self.actor(
+            ";".join(self.message_sql(ordinal) for ordinal in range(2, count + 1))
+        )
+        return self.actor(f"""
+            SELECT revision_id FROM archive.conversation_visible_revisions
+            WHERE conversation_id='{self.conversation}' AND ordinal={count}
+        """).stdout.strip()
+
+    def validation_calls_sql(self):
+        return """
+            SELECT coalesce(sum(calls),0) FROM pg_stat_xact_user_functions
+            WHERE funcid='archive.require_exact_branch_snapshot()'::regprocedure
+        """
+
     def branch_sql(self, child, parent=None, point=None, mode="after_revision"):
         parent = parent or self.conversation
         point = point or self.revision
@@ -2193,6 +2208,130 @@ def branch_rows(branch_database):
     return rows
 
 
+@pytest.fixture
+def tracked_branch_rows(branch_rows):
+    # Test-only superuser configuration; transactions still use the actual API
+    # login and its unchanged grants. Transaction-local counters need no polling.
+    branch_rows.database.sql("ALTER ROLE mimir_api SET track_functions='pl'")
+    try:
+        yield branch_rows
+    finally:
+        branch_rows.database.sql("ALTER ROLE mimir_api RESET track_functions")
+
+
+@pytest.mark.parametrize("count", (1000, 2000, 5000))
+@pytest.mark.parametrize("nested", (False, True), ids=("root", "nested"))
+def test_t06_large_prefix_validated_once(tracked_branch_rows, count, nested):
+    rows = tracked_branch_rows
+    point = rows.seed_prefix(count)
+    expected = rows.visible(rows.conversation)
+    parent = rows.conversation
+    if nested:
+        parent = rows.create_branch(point=point)
+    child = str(uuid.uuid7())
+    started = time.monotonic()
+    result = rows.actor(
+        rows.branch_sql(child, parent=parent, point=point)
+        + ";"
+        + rows.snapshot_sql(child, parent=parent)
+        + ";"
+        + rows.validation_calls_sql()
+        + "; SET CONSTRAINTS ALL IMMEDIATE;"
+        + rows.validation_calls_sql()
+        + "; SET CONSTRAINTS ALL IMMEDIATE;"
+        + rows.validation_calls_sql()
+    )
+    elapsed = time.monotonic() - started  # Includes successful COMMIT, excludes seed.
+    print(f"T06 prefix={count} nested={nested} commit_seconds={elapsed:.3f}")
+    assert result.stdout.splitlines() == ["0", "1", "1"]
+    assert rows.visible(child) == expected
+
+
+def test_t06_split_inserts_and_multiple_branches_validate_once_each(
+    tracked_branch_rows,
+):
+    rows = tracked_branch_rows
+    point = rows.seed_prefix(3)
+    children = [str(uuid.uuid7()), str(uuid.uuid7())]
+    statements = []
+    for child in children:
+        statements.append(rows.branch_sql(child, point=point))
+        for ordinal in range(1, 4):
+            statements.append(rows.snapshot_sql(child) + f" AND p.ordinal={ordinal}")
+    statements.extend(
+        (
+            rows.validation_calls_sql(),
+            "SET CONSTRAINTS ALL IMMEDIATE",
+            rows.validation_calls_sql(),
+        )
+    )
+    assert rows.actor(";".join(statements)).stdout.splitlines() == ["0", "2"]
+    for child in children:
+        assert rows.visible(child) == rows.visible(rows.conversation)
+
+
+@pytest.mark.parametrize("complete", (False, True))
+def test_t06_explicit_constraint_check_preserves_completeness(branch_rows, complete):
+    rows = branch_rows
+    child = str(uuid.uuid7())
+    sql = rows.branch_sql(child)
+    if complete:
+        sql += ";" + rows.snapshot_sql(child)
+    result = rows.actor(sql + "; SET CONSTRAINTS ALL IMMEDIATE", check=False)
+    if complete:
+        assert result.returncode == 0
+        assert rows.visible(child) == rows.visible(rows.conversation)
+    else:
+        assert result.returncode != 0 and "dense exact parent prefix" in result.stderr
+        assert (
+            rows.actor(
+                f"SELECT count(*) FROM archive.conversations WHERE conversation_id='{child}'"
+            ).stdout.strip()
+            == "0"
+        )
+
+
+@pytest.mark.parametrize("empty", (False, True))
+@pytest.mark.parametrize("committed", (False, True))
+def test_t06_snapshot_cannot_extend_after_successful_validation(
+    branch_rows, empty, committed
+):
+    rows = branch_rows
+    child = str(uuid.uuid7())
+    create = (
+        rows.branch_sql(child, mode="replace_message" if empty else "after_revision")
+        + ";"
+        + rows.snapshot_sql(child)
+    )
+    point = rows.seed_prefix(2)
+    insert = f"""
+        INSERT INTO archive.conversation_branch_revisions
+            (user_id,conversation_id,ordinal,message_id,revision_id)
+        SELECT user_id,'{child}',{1 if empty else 2},message_id,revision_id
+        FROM archive.conversation_visible_revisions
+        WHERE conversation_id='{rows.conversation}' AND revision_id='{point}'
+    """
+    if committed:
+        rows.actor(create)
+        result = rows.actor(insert, check=False)
+    else:
+        result = rows.actor(
+            create + "; SET CONSTRAINTS ALL IMMEDIATE;" + insert, check=False
+        )
+    assert result.returncode != 0 and "dense exact parent prefix" in result.stderr
+    if committed:
+        assert rows.visible(child) == (
+            [] if empty else [f"1|{rows.message}|{rows.revision}"]
+        )
+    else:
+        assert (
+            rows.actor(
+                f"SELECT count(*) FROM archive.conversations WHERE conversation_id='{child}'"
+            ).stdout.strip()
+            == "0"
+        )
+
+
 def test_t06_fresh_repeat_validate_restart_and_catalog(branch_rows):
     rows = branch_rows
     child = rows.create_branch()
@@ -2222,9 +2361,10 @@ def test_t06_fresh_repeat_validate_restart_and_catalog(branch_rows):
     )
     assert database.sql("""
         SELECT tgname,tgdeferrable,tginitdeferred FROM pg_trigger
-        WHERE tgname IN ('branch_snapshot_required','branch_snapshot_exact') ORDER BY tgname
+        WHERE tgname IN ('branch_snapshot_required','branch_revision_insert_guard',
+            'branch_snapshot_exact') ORDER BY tgname
     """).stdout.splitlines() == [
-        "branch_snapshot_exact|t|t",
+        "branch_revision_insert_guard|f|f",
         "branch_snapshot_required|t|t",
     ]
     assert (
@@ -2428,7 +2568,9 @@ def test_t06_incomplete_branch_and_missing_actor_fail_closed(branch_rows):
     "fault", ("missing", "gap", "swapped", "wrong_revision", "extra", "root")
 )
 @pytest.mark.parametrize("clear_actor", (False, True))
-def test_t06_malformed_snapshot_rolls_back_at_commit(branch_rows, fault, clear_actor):
+def test_t06_malformed_snapshot_rejected_and_rolled_back(
+    branch_rows, fault, clear_actor
+):
     rows = branch_rows
     rows.actor(rows.message_sql(2))
     point = rows.actor(
@@ -2460,10 +2602,16 @@ def test_t06_malformed_snapshot_rolls_back_at_commit(branch_rows, fault, clear_a
         create
         + "; INSERT INTO archive.conversation_branch_revisions(user_id,conversation_id,ordinal,message_id,revision_id) "
         + select_sql
+        + "; SELECT 'reference_inserts_finished'"
         + ("; RESET app.current_user_id" if clear_actor else ""),
         check=False,
     )
     assert result.returncode != 0 and "dense exact parent prefix" in result.stderr
+    # Missing/substituted/reordered content fails at the deferred commit guard;
+    # an upper-bound violation must fail immediately before this marker.
+    assert ("reference_inserts_finished" in result.stdout) == (
+        fault in ("missing", "swapped", "wrong_revision")
+    )
     assert (
         rows.actor(
             f"SELECT count(*) FROM archive.conversations WHERE conversation_id='{child}'"

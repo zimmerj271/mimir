@@ -179,11 +179,17 @@ In one transaction, insert the branch conversation, then insert its complete
 ordered prefix into `archive.conversation_branch_revisions` before commit.
 Each entry stores only owner, child conversation, visible ordinal, message ID and
 exact revision ID. Composite FKs enforce owner/message/revision relationships.
-Deferred constraints reject missing, extra, reordered, gapped or substituted
-references and roll back the entire transaction. They inspect final rows even
-when trusted code has cleared/switched actor context. Parent linkage and prefix
-length cannot change; snapshot UPDATE is rejected, including by the owner.
-An already complete snapshot cannot be extended later.
+An immediate invoker-rights insertion guard rejects ordinals above the frozen
+prefix length using one owned-conversation lookup, without scanning snapshots.
+Positive ordinals and uniqueness remain table constraints. One deferred check per
+new conversation counts its final references and compares them with the exact
+parent prefix using a set difference. Missing, reordered, gapped or substituted
+references cannot commit, even when trusted code has cleared/switched actor
+context. The complete validator is not queued per reference. Parent linkage and
+prefix length cannot change; snapshot UPDATE is rejected, including by the owner.
+A complete prefix occupies every slot from one through its frozen length, so
+uniqueness plus the immediate upper bound also forbid later extension, including
+after an explicit successful `SET CONSTRAINTS ALL IMMEDIATE`.
 
 `archive.conversation_visible_revisions` is a security-invoker view combining
 flattened inherited references with local messages. V003's local ordinals still
@@ -204,6 +210,13 @@ dependent parents/revisions until a separately authorized subtree purge.
 repeat, restart, V003 upgrade, transactional DDL rollback/retry and checksum drift
 tests, plus nested branches, boundary/negative cases, role/RLS checks and competing
 branch/append/delete transactions. Tests use labelled disposable volumes only.
+Large-prefix tests cover 1,000/2,000/5,000 references from root and nested parents,
+assert one full-validator invocation per new conversation with transaction-local
+PostgreSQL function counters, and report transaction timings through successful
+commit. Function tracking is configured only in the isolated test stack; runtime
+permissions and deployment configuration are unchanged. Multiple insertion
+statements/branches, early constraint checks and extension of empty/complete
+snapshots are regression cases. Timing reports are measurements, not release SLOs.
 The [traceability mapping](../../TRACEABILITY.md) describes partial storage
 acceptance; actual command results and submitted SHA belong to the PR.
 
@@ -213,6 +226,13 @@ retry migrate, then validate. After successful V004 there is no down migration:
 Git revert does not undo schema. Reversal requires separately approved forward
 SQL or coordinated offline restore. Never edit applied history, repair/clean
 checksums, or remove retained volumes.
+
+PR #8 review R1 corrects the candidate V004 validation mechanism within T06.
+The owner confirmed V004 had only been applied to disposable test databases and
+authorized this correction; no retained migration history is rewritten. Existing
+disposable databases with the old checksum must not be repaired for reuse.
+Recreate only owned disposable test stacks from the revised candidate. Applied
+non-disposable V004 would instead require separately authorized forward SQL.
 
 No branch service/HTTP producer, version/idempotency transaction, inference,
 memory ingestion or governed subtree purge is implemented here (T10/T11/T12,
