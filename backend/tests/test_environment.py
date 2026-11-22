@@ -142,19 +142,55 @@ def test_wheel_and_sdist_install_without_source_checkout(project: Path) -> None:
     (rebuilt,) = (project / "rebuilt").glob("*.whl")
     outside = project.parent / "outside"
     outside.mkdir()
+    # T08 adds runtime dependencies. Install their exact locked artifacts rather
+    # than requiring unseeded registry index metadata for an offline re-resolve.
+    # This temporary export is derived from uv.lock, never a second authority.
+    runtime_lock = outside / "pylock.runtime.toml"
+    result = run_uv(
+        project,
+        "export",
+        "--locked",
+        "--no-default-groups",
+        "--no-emit-project",
+        "--format",
+        "pylock.toml",
+        "--output-file",
+        str(runtime_lock),
+    )
+    assert result.returncode == 0, result.stderr
+    environment = outside / ".venv"
+    result = run_uv(outside, "venv", "--python", sys.executable, str(environment))
+    assert result.returncode == 0, result.stderr
+    interpreter = environment / "bin/python"
+    result = run_uv(
+        outside, "pip", "sync", "--python", str(interpreter), str(runtime_lock)
+    )
+    assert result.returncode == 0, result.stderr
+    result = run_uv(
+        outside,
+        "pip",
+        "install",
+        "--python",
+        str(interpreter),
+        "--no-deps",
+        str(rebuilt),
+    )
+    assert result.returncode == 0, result.stderr
+    # --no-deps uses the locked environment above; check still validates the
+    # installed wheel's declared dependencies instead of bypassing compatibility.
+    result = run_uv(outside, "pip", "check", "--python", str(interpreter))
+    assert result.returncode == 0, result.stderr
     result = run_uv(
         outside,
         "run",
-        "--isolated",
         "--no-project",
-        "--with",
-        str(rebuilt),
         "--python",
-        sys.executable,
+        str(interpreter),
         "python",
         "-I",
         "-c",
-        "import mimir_backend; from importlib.resources import files; "
+        "import mimir_backend, mimir_backend.auth, mimir_backend.auth_postgres; "
+        "from importlib.resources import files; "
         "assert files(mimir_backend).joinpath('py.typed').is_file()",
     )
     assert result.returncode == 0, result.stderr

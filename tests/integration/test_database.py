@@ -1,9 +1,10 @@
-"""T03–T07 real PostgreSQL 18/Flyway tests, never skip a missing daemon.
+"""T03–T08 real PostgreSQL 18/Flyway tests, never skip a missing daemon.
 
 All fixtures use unique labelled disposable volumes. T03 fixtures stop at V001;
-T04–T07 exercise real V002–V005 on fresh and upgrade paths.
+T04–T08 exercise real V002–V006 on fresh and upgrade paths.
 """
 
+import asyncio
 import concurrent.futures
 import contextlib
 import hashlib
@@ -17,9 +18,33 @@ import sys
 import threading
 import time
 import uuid
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
+import pytest_asyncio
+from sqlalchemy import URL, text
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from mimir_backend.auth import (
+    AccountAlreadyExists,
+    AuthenticationRejected,
+    AuthService,
+    AuthStorageError,
+    ClientType,
+    PasswordService,
+    ProvisioningService,
+    SessionTokens,
+    SystemClock,
+)
+from mimir_backend.auth_postgres import (
+    AuthDatabase,
+    PostgresAuthRepository,
+    PostgresProvisioningRepository,
+)
+from mimir_backend.provision import MaintenanceCommand
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "deployment"))
@@ -3981,3 +4006,581 @@ def test_t07_deletion_control_metadata_requires_fence_and_verified_state_sequenc
         ).returncode
         != 0
     )
+
+
+# T08 uses the actual services/SQLAlchemy adapters against the private test DB.
+# Linux Docker bridge IPs are reachable from this test host; no published DB port
+# or production topology change is necessary. CI's real-engine gate is Linux.
+V006 = "V006__restricted_auth_operations.sql"
+
+
+@pytest.fixture(scope="module")
+def session_database(tmp_path_factory):
+    stack = DatabaseStack(
+        tmp_path_factory.mktemp("session-database"), through_version=6
+    )
+    try:
+        stack.start()
+        stack.migrate()
+        yield stack
+    finally:
+        stack.cleanup()
+
+
+class SessionServices:
+    def __init__(self, stack):
+        self.stack = stack
+        info = json.loads(stack.compose("ps", "--format", "json").stdout)
+        # Compose emits one JSON object for the sole long-running service.
+        if isinstance(info, list):
+            info = info[0]
+        container = json.loads(stack.docker("inspect", info["ID"]).stdout)[0]
+        networks = container["NetworkSettings"]["Networks"]
+        self.host = next(iter(networks.values()))["IPAddress"]
+        self.auth_database = self.database("mimir_auth")
+        self.maintenance_database = self.database("mimir_maintenance")
+        self.repository = PostgresAuthRepository(self.auth_database)
+        self.passwords = PasswordService()
+        self.tokens = SessionTokens()
+        self.auth = AuthService(
+            self.repository, self.passwords, self.tokens, SystemClock()
+        )
+        self.admin = ProvisioningService(
+            PostgresProvisioningRepository(self.maintenance_database), self.passwords
+        )
+        self.username = f"synthetic_t08_{uuid.uuid7()}"
+        self.password = "synthetic T08 test password"
+        self.user = None
+
+    def database(self, role):
+        return AuthDatabase(
+            URL.create(
+                "postgresql+psycopg",
+                username=role,
+                password=self.stack.passwords[role].read_text().strip(),
+                host=self.host,
+                database="mimir",
+            )
+        )
+
+    async def seed(self):
+        self.user = await self.admin.provision(self.username, self.password)
+
+    async def login(self):
+        return await self.auth.login(self.username, self.password, ClientType.CLI)
+
+    async def close(self):
+        await self.auth_database.close()
+        await self.maintenance_database.close()
+
+    def seed_session(
+        self, *, created="-1 day", used="-1 day", idle="+1 day", absolute="+89 days"
+    ):
+        token = self.tokens.generate()
+        key = self.tokens.digest(token).hex()
+        self.stack.sql(f"""
+            INSERT INTO auth.sessions(token_hash,user_id,identity_id,client_type,
+                created_at,last_used_at,expires_at,absolute_expires_at)
+            SELECT decode('{key}','hex'),user_id,identity_id,'cli',
+                now()+interval '{created}',now()+interval '{used}',
+                now()+interval '{idle}',now()+interval '{absolute}'
+            FROM auth.identities WHERE user_id='{self.user}'
+        """)
+        return token
+
+    async def wait_for_auth_lock(self, minimum=1):
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            count = int(
+                self.stack.sql("""
+                SELECT count(*) FROM pg_stat_activity
+                WHERE usename='mimir_auth' AND wait_event_type='Lock'
+            """).stdout.strip()
+            )
+            if count >= minimum:
+                return
+            await asyncio.sleep(0.02)
+        raise AssertionError("Auth callers did not reach the account lock")
+
+
+@pytest_asyncio.fixture
+async def session_services(session_database):
+    services = SessionServices(session_database)
+    try:
+        await services.seed()
+        yield services
+    finally:
+        await services.close()
+
+
+def test_t08_fresh_repeat_restart_validate_and_routine_catalog(session_database):
+    database = session_database
+    sql = "SELECT version,checksum,success FROM public.flyway_schema_history ORDER BY installed_rank"
+    before = database.sql(sql).stdout
+    assert [line.split("|")[0] for line in before.splitlines()] == [
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+        "006",
+    ]
+    database.migrate()
+    database.flyway("validate")
+    database.compose("restart", "postgres")
+    database.compose("up", "-d", "--wait", "postgres")
+    database.flyway("validate")
+    assert database.sql(sql).stdout == before
+    assert (
+        database.sql("""
+        SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE (n.nspname,c.relname) IN
+            (('archive','users'),('auth','identities'),('auth','sessions'))
+            AND c.relrowsecurity AND c.relforcerowsecurity
+            AND pg_get_userbyid(c.relowner)='mimir_owner'
+    """).stdout.strip()
+        == "3"
+    )
+    assert (
+        database.sql("""
+        SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='auth' AND p.proname IN
+            ('provision_user','disable_account','issue_session','renew_session','revoke_session')
+            AND p.prosecdef AND pg_get_userbyid(p.proowner)='mimir_owner'
+            AND p.proconfig @> ARRAY['search_path=pg_catalog, pg_temp','row_security=on']
+            AND NOT EXISTS (SELECT FROM aclexplode(p.proacl) a WHERE a.grantee=0)
+    """).stdout.strip()
+        == "5"
+    )
+
+
+def test_t08_v005_upgrade_failure_rollback_recovery_and_drift(tmp_path):
+    database = DatabaseStack(tmp_path, through_version=5)
+    try:
+        database.start()
+        database.migrate()
+        rows = RuntimeRows(database)
+        rows.seed()
+        rows.actor(rows.run_sql())
+        legacy = AuthRows(database)
+        legacy.seed()
+        legacy_sql = f"SELECT user_id,identity_id,absolute_expires_at FROM auth.sessions WHERE token_hash=decode('{legacy.hash}','hex')"
+        legacy_before = database.sql(legacy_sql).stdout
+        history_sql = "SELECT version,checksum FROM public.flyway_schema_history ORDER BY installed_rank"
+        before = database.sql(history_sql).stdout
+        candidate = database.migrations / V006
+        original = (ROOT / "backend/migrations" / V006).read_bytes()
+        candidate.write_bytes(original + b"\nSELECT 1/0;\n")
+        assert database.flyway("migrate", check=False).returncode != 0
+        assert database.sql(history_sql).stdout == before
+        assert (
+            database.sql(
+                "SELECT to_regprocedure('auth.renew_session(bytea)') IS NULL"
+            ).stdout.strip()
+            == "t"
+        )
+        assert (
+            database.sql(
+                "SELECT count(*) FROM pg_proc WHERE proname='provision_user'"
+            ).stdout.strip()
+            == "0"
+        )
+        candidate.write_bytes(original)
+        database.flyway("migrate")
+        database.flyway("validate")
+        assert database.sql(history_sql + " LIMIT 5").stdout == before
+        assert database.sql(legacy_sql).stdout == legacy_before
+        assert (
+            database.sql(
+                f"SELECT user_id FROM auth.renew_session(decode('{legacy.hash}','hex'))",
+                "mimir_auth",
+            ).stdout.strip()
+            == legacy.user
+        )
+        assert (
+            rows.actor(
+                f"SELECT status FROM runtime.model_runs WHERE run_id='{rows.run}'"
+            ).stdout.strip()
+            == "pending"
+        )
+        try:
+            candidate.write_bytes(original + b"\nSELECT 12345;\n")
+            failed = database.flyway("validate", check=False)
+            assert (
+                failed.returncode != 0
+                and "checksum" in (failed.stdout + failed.stderr).lower()
+            )
+            assert database.flyway("migrate", check=False).returncode != 0
+        finally:
+            candidate.write_bytes(original)
+        database.flyway("validate")
+    finally:
+        database.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_t08_provision_login_hash_only_exact_case_injection_and_rejection(
+    session_services, caplog
+):
+    services = session_services
+    assert services.user.version == 7
+    issued = await services.login()
+    assert issued.session.user_id == services.user
+    key = services.tokens.digest(issued.token)
+    row = services.stack.sql(f"""
+        SELECT octet_length(token_hash),expires_at-s.created_at,absolute_expires_at-s.created_at,
+            password_hash LIKE '$argon2id$v=19$%'
+        FROM auth.sessions s JOIN auth.identities USING (user_id,identity_id)
+        WHERE token_hash=decode('{key.hex()}','hex')
+    """).stdout.strip()
+    assert row == "32|30 days|90 days|t"
+    assert issued.token not in repr(issued) and issued.token not in caplog.text
+    # No normalization, and SQLAlchemy bind parameters preserve hostile-looking text.
+    other_name = services.username.upper() + "'); SELECT 1; --"
+    other = await services.admin.provision(other_name, services.password)
+    assert other != services.user
+    await services.auth.login(other_name, services.password, ClientType.WEB)
+    with pytest.raises(AccountAlreadyExists):
+        await services.admin.provision(services.username, services.password)
+    assert (
+        services.stack.sql(
+            f"SELECT count(*) FROM archive.users WHERE user_id='{services.user}'"
+        ).stdout.strip()
+        == "1"
+    )
+    for username, password in (
+        (services.username.upper(), services.password),
+        (services.username, "wrong synthetic password"),
+        ("unknown synthetic username", services.password),
+    ):
+        with pytest.raises(AuthenticationRejected):
+            await services.auth.login(username, password, ClientType.CLI)
+    assert (
+        services.stack.sql(
+            f"SELECT count(*) FROM auth.sessions WHERE user_id='{services.user}'"
+        ).stdout.strip()
+        == "1"
+    )
+    identity = await services.repository.lookup_identity(services.username)
+    assert identity is not None
+    assert not await services.repository.issue_session(
+        replace(identity, password_hash="stale synthetic verifier"),
+        services.tokens.digest(services.tokens.generate()),
+        ClientType.CLI,
+    )
+
+
+@pytest.mark.asyncio
+async def test_t08_competing_provision_is_atomic_without_orphan_accounts(
+    session_services,
+):
+    services = session_services
+    before = services.stack.sql("SELECT count(*) FROM archive.users").stdout
+    username = f"synthetic_duplicate_{uuid.uuid7()}"
+    results = await asyncio.gather(
+        services.admin.provision(username, services.password),
+        services.admin.provision(username, services.password),
+        return_exceptions=True,
+    )
+    assert sum(isinstance(value, uuid.UUID) for value in results) == 1
+    assert sum(isinstance(value, AccountAlreadyExists) for value in results) == 1
+    assert (
+        int(services.stack.sql("SELECT count(*) FROM archive.users").stdout)
+        == int(before) + 1
+    )
+
+
+@pytest.mark.asyncio
+async def test_t08_concurrent_renewal_keeps_token_and_monotonic_lifetime(
+    session_services,
+):
+    services = session_services
+    token = services.seed_session(
+        created="-20 days", used="-2 days", idle="+10 days", absolute="+70 days"
+    )
+    first, second = await asyncio.gather(
+        services.auth.authenticate(token), services.auth.authenticate(token)
+    )
+    assert first.user_id == second.user_id == services.user
+    assert max(first.expires_at, second.expires_at) > datetime.now(UTC) + timedelta(
+        days=29
+    )
+    assert first.absolute_expires_at == second.absolute_expires_at
+    assert (
+        services.stack.sql(
+            f"SELECT count(*) FROM auth.sessions WHERE user_id='{services.user}'"
+        ).stdout.strip()
+        == "1"
+    )
+    identity = await services.repository.lookup_identity(services.username)
+    assert identity is not None
+    # A separate session remains valid when the first session logs out.
+    other = await services.login()
+    await services.auth.logout(token)
+    await services.auth.logout(token)
+    with pytest.raises(AuthenticationRejected):
+        await services.auth.authenticate(token)
+    assert (await services.auth.authenticate(other.token)).user_id == services.user
+
+
+@pytest.mark.asyncio
+async def test_t08_expiry_cap_and_never_reactivate_expired_or_revoked(session_services):
+    services = session_services
+    capped = services.seed_session(
+        created="-89 days", used="-1 day", idle="+12 hours", absolute="+1 day"
+    )
+    renewed = await services.auth.authenticate(capped)
+    assert renewed.expires_at == renewed.absolute_expires_at
+    for kwargs in (
+        {"idle": "0 seconds"},
+        {"idle": "-1 hour", "absolute": "0 seconds"},
+    ):
+        token = services.seed_session(**kwargs)
+        key = services.tokens.digest(token)
+        before = await services.repository.lookup_session(key)
+        assert before is not None
+        with pytest.raises(AuthenticationRejected):
+            await services.auth.authenticate(token)
+        assert await services.repository.renew_session(key) is None
+        assert await services.repository.lookup_session(key) == before
+    await services.auth.logout(capped)
+    assert (
+        await services.repository.renew_session(services.tokens.digest(capped)) is None
+    )
+    await services.auth.logout(services.tokens.generate())
+
+
+@pytest.mark.asyncio
+async def test_t08_disable_wins_waiting_issuance_and_renewal_races(session_services):
+    services = session_services
+    issued = await services.login()
+    second = await services.login()
+    other_name = services.username + "_other_owner"
+    other_owner = await services.admin.provision(other_name, services.password)
+    other = await services.auth.login(other_name, services.password, ClientType.WEB)
+    # The real disable operation holds the account lock until commit. Other
+    # connections see the old state for lookup, then block at their final check.
+    async with services.maintenance_database.engine.begin() as connection:
+        await connection.execute(
+            text("SELECT auth.disable_account(:user)"), {"user": services.user}
+        )
+        login = asyncio.create_task(services.login())
+        renewal = asyncio.create_task(services.auth.authenticate(issued.token))
+        await services.wait_for_auth_lock(minimum=2)
+    results = await asyncio.gather(login, renewal, return_exceptions=True)
+    assert all(isinstance(result, AuthenticationRejected) for result in results)
+    assert (
+        services.stack.sql(
+            f"SELECT count(*) FROM auth.sessions WHERE user_id='{services.user}' AND revoked_at IS NULL"
+        ).stdout.strip()
+        == "0"
+    )
+    assert await services.admin.disable(services.user)
+    assert not await services.admin.disable(uuid.uuid7())
+    with pytest.raises(AuthenticationRejected):
+        await services.auth.authenticate(second.token)
+    assert (await services.auth.authenticate(other.token)).user_id == other_owner
+    with pytest.raises(AuthenticationRejected):
+        await services.login()
+
+
+@pytest.mark.asyncio
+async def test_t08_revocation_wins_waiting_renewal(session_services):
+    services = session_services
+    issued = await services.login()
+    async with services.auth_database.engine.begin() as connection:
+        await connection.execute(
+            text("SELECT auth.revoke_session(:hash)"),
+            {"hash": services.tokens.digest(issued.token)},
+        )
+        renewal = asyncio.create_task(services.auth.authenticate(issued.token))
+        await services.wait_for_auth_lock()
+    with pytest.raises(AuthenticationRejected):
+        await renewal
+
+
+@pytest.mark.asyncio
+async def test_t08_routines_restore_actor_on_pooled_commit_rollback_and_hostile_settings(
+    session_services,
+):
+    services = session_services
+    issued = await services.login()
+    key = services.tokens.digest(issued.token)
+    for end in ("commit", "rollback"):
+        async with services.auth_database.engine.connect() as connection:
+            transaction = await connection.begin()
+            await connection.execute(
+                text("SET LOCAL app.current_user_id='malformed-untrusted-context'")
+            )
+            await connection.execute(text("SET LOCAL row_security=off"))
+            await connection.execute(text("SET LOCAL search_path=pg_temp"))
+            await connection.execute(text("SET LOCAL timezone='America/New_York'"))
+            row = (
+                (
+                    await connection.execute(
+                        text("SELECT * FROM auth.renew_session(:hash)"), {"hash": key}
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            assert row["user_id"] == services.user
+            assert (
+                await connection.execute(
+                    text("SELECT current_setting('app.current_user_id')")
+                )
+            ).scalar_one() == "malformed-untrusted-context"
+            await getattr(transaction, end)()
+            context = (
+                await connection.execute(
+                    text("SELECT current_setting('app.current_user_id',true)")
+                )
+            ).scalar_one()
+            assert context in ("", None)
+    # Provision/disable also restore administrator context instead of leaking the
+    # selected account to the next operation on the same pooled connection.
+    async with services.maintenance_database.engine.begin() as connection:
+        await connection.execute(
+            text("SET LOCAL app.current_user_id='previous-admin-context'")
+        )
+        await connection.execute(
+            text("SELECT auth.disable_account(:user)"), {"user": services.user}
+        )
+        assert (
+            await connection.execute(
+                text("SELECT current_setting('app.current_user_id')")
+            )
+        ).scalar_one() == "previous-admin-context"
+
+
+@pytest.mark.parametrize("role", RUNTIME)
+def test_t08_actual_role_least_privilege_and_execution_allowlist(
+    session_database, role
+):
+    database = session_database
+    for table in ("auth.identities", "auth.sessions"):
+        for operation in ("SELECT * FROM", "DELETE FROM", "UPDATE"):
+            sql = f"{operation} {table}"
+            if operation == "UPDATE":
+                sql += " SET user_id=user_id"
+            result = database.sql(sql, f"mimir_{role}", check=False)
+            assert result.returncode != 0 and "permission denied" in result.stderr
+        assert (
+            database.sql(
+                f"INSERT INTO {table} DEFAULT VALUES", f"mimir_{role}", check=False
+            ).returncode
+            != 0
+        )
+    result = database.sql(
+        "UPDATE archive.users SET status='active'", f"mimir_{role}", check=False
+    )
+    assert result.returncode != 0 and "permission denied" in result.stderr
+    for name, arguments, allowed in (
+        ("provision_user", "NULL,NULL,NULL,NULL,NULL", "maintenance"),
+        ("disable_account", f"'{uuid.uuid7()}'::uuid", "maintenance"),
+        ("issue_session", "NULL,NULL,NULL,NULL", "auth"),
+        ("renew_session", "NULL::bytea", "auth"),
+        ("revoke_session", "NULL::bytea", "auth"),
+    ):
+        if role == allowed:
+            continue
+        result = database.sql(
+            f"SELECT auth.{name}({arguments})", f"mimir_{role}", check=False
+        )
+        assert result.returncode != 0 and "permission denied" in result.stderr
+    assert (
+        database.sql(
+            f"SELECT rolsuper,rolbypassrls,pg_has_role('mimir_{role}','mimir_owner','SET') FROM pg_roles WHERE rolname='mimir_{role}'"
+        ).stdout.strip()
+        == "f|f|f"
+    )
+
+
+@pytest.mark.asyncio
+async def test_t08_malformed_parameters_storage_failure_and_transaction_recovery(
+    session_services,
+):
+    services = session_services
+    # No successful principal is returned if persistence fails; the next pooled
+    # operation must start cleanly after the failed transaction rolls back.
+    identity = await services.repository.lookup_identity(services.username)
+    assert identity is not None
+    with pytest.raises(AuthStorageError):
+        await services.repository.issue_session(identity, b"short", ClientType.CLI)
+    assert await services.login()
+    with pytest.raises(AuthStorageError):
+        await PostgresProvisioningRepository(services.auth_database).disable(
+            services.user
+        )
+    assert await services.login()
+
+
+@pytest.mark.asyncio
+async def test_t08_expiration_while_waiting_for_lock_cannot_renew(session_services):
+    services = session_services
+    token = services.seed_session(idle="+3 seconds")
+    key = services.tokens.digest(token)
+    original = await services.repository.lookup_session(key)
+    assert original is not None
+    # Privileged connection is confined to this uniquely labelled disposable DB.
+    engine = create_async_engine(
+        URL.create(
+            "postgresql+psycopg",
+            username="postgres",
+            host=services.host,
+            password=services.stack.passwords["postgres_bootstrap"].read_text().strip(),
+            database="mimir",
+        ),
+        hide_parameters=True,
+    )
+    task = None
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("SELECT FROM archive.users WHERE user_id=:user FOR UPDATE"),
+                {"user": services.user},
+            )
+            task = asyncio.create_task(services.auth.authenticate(token))
+            await services.wait_for_auth_lock()
+            await asyncio.sleep(
+                max(0, (original.expires_at - datetime.now(UTC)).total_seconds()) + 0.02
+            )
+        with pytest.raises(AuthenticationRejected):
+            await task
+        assert await services.repository.lookup_session(key) == original
+    finally:
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_t08_local_admin_command_real_create_disable(session_services, capsys):
+    services = session_services
+    command = MaintenanceCommand()
+    common = [
+        "--host",
+        services.host,
+        "--credential-file",
+        str(services.stack.passwords["mimir_maintenance"]),
+    ]
+    username = f"synthetic_command_{uuid.uuid7()}"
+    args = command.parser().parse_args([*common, "create-user", "--username", username])
+    with patch(
+        "mimir_backend.provision.getpass.getpass", return_value=services.password
+    ):
+        assert await command.run(args) == 0
+    identity = await services.repository.lookup_identity(username)
+    assert identity is not None
+    issued = await services.auth.login(username, services.password, ClientType.CLI)
+    args = command.parser().parse_args(
+        [*common, "disable-user", "--user-id", str(identity.user_id)]
+    )
+    assert await command.run(args) == 0
+    with pytest.raises(AuthenticationRejected):
+        await services.auth.authenticate(issued.token)
+    output = capsys.readouterr()
+    assert services.password not in output.out + output.err
+    assert issued.token not in output.out + output.err

@@ -15,6 +15,27 @@ Examples to seed the matrix (not test-pass claims): auth/session renewal → T24
 
 ## Complete acceptance ownership seed (not test execution evidence)
 
+T08 authentication/provisioning coverage → `backend/tests/test_auth.py` and
+`tests/integration/test_database.py` (`test_t08_*`). API-SESSION-01 receives
+service-level 30-day idle/90-day absolute lifetime, hash lookup and silent
+renewal coverage. AUTH-RENEW-01 receives real PostgreSQL concurrent bearer reuse,
+absolute ceiling, logout, account disablement and revoked/expired rejection
+coverage. SEC-01 receives local administrator provisioning, Argon2id verification,
+256-bit bearer issuance/hash-only persistence, restricted routine grants and
+credential-table mutation denial coverage. Supporting DB-01/DB-02,
+DB-ROLE-01/DB-MIG-01 evidence includes FORCE RLS, pooled transaction context
+restoration, fresh/repeat/restart V001–V006, V005 upgrade preserving accounts,
+sessions/runtime data, transactional failure/recovery and checksum drift.
+Disable/revoke/expiry-during-lock races and competing provision/renewal use real
+PostgreSQL transactions; deterministic tests cover crypto/resource bounds,
+password-work cancellation and redacted error/secret handling. The owner
+explicitly authorized T08's forward-only V006 restricted mutation interfaces;
+V001–V005 and public contracts are unchanged. HTTP routes, cookie/CSRF/origin
+guards (T09), public producer/consumer conformance (S01/T20/T24), full purge,
+restore and cross-user run/job access remain successor work. Normative ownership
+and requirement status are unchanged. Literal results, limitations and exact
+submitted review SHA belong to the T08 PR.
+
 T07 runtime storage coverage → `tests/integration/test_database.py`
 (`test_t07_*`), real PostgreSQL 18/Flyway. Tests cover fresh/repeat/restart
 V001–V005; V004 upgrade with retained branch history; deliberate failed V005
