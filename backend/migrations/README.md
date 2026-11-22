@@ -3,8 +3,8 @@
 T03 implements `V001__roles_and_schemas.sql`. T04 implements
 `V002__users_identities_and_sessions.sql`. T05 adds
 `V003__projects_conversations_and_messages.sql`. T06 adds
-`V004__immutable_branch_snapshots.sql`; T07 owns V005 runtime/jobs in a
-separately reviewed PR.
+`V004__immutable_branch_snapshots.sql`; T07 adds
+`V005__runtime_jobs_and_operations.sql` in a separately reviewed PR.
 No Alembic or ORM-generated production DDL.
 Historical `../appendix/v2-reference/` SQL is non-normative and must not run.
 
@@ -238,3 +238,95 @@ No branch service/HTTP producer, version/idempotency transaction, inference,
 memory ingestion or governed subtree purge is implemented here (T10/T11/T12,
 T16/T33 and T35/T36 retain those boundaries). No contract/dependency changes;
 S01 validation and the recorded `Message.status` reconciliation remain pending.
+
+## V005 runtime storage
+
+T07 is based on merged T06 main `a562761ebd8dc5804b78e39e073bee5a7999c918`.
+V001–V004 remain unchanged. V005 adds eight owner-scoped operational tables:
+
+- `model_runs`: conversation/standalone shape, owned input/output message roles,
+  one active conversation run, executor token/generation/lease, monotonic
+  checkpoints, cancellation request, terminal state and standalone expiry.
+- `model_run_attempts`: per-run attempt identity, one open attempt, provider/token
+  metadata, nonnegative usage and immutable terminal/visible-output evidence.
+- `jobs`: claim/retry/reconciliation states, bounded attempt counter, token and
+  generation, lease/heartbeat shape, claim/FIFO/expired-lease indexes and one
+  running memory-ingestion job per user. Independent users remain concurrent.
+- `memory_ingestions`: delivery metadata for an exact successful conversational
+  user/assistant revision pair, original project hint and provider configuration;
+  deduplication follows the approved pair/configuration identity. This is not
+  provider-owned managed-memory content or a canonical memory table.
+- `operation_ledger`: owner/type/key uniqueness, 32-byte request fingerprint,
+  typed run/conversation/message/version identities, accepted/terminal status,
+  30-day retained identity, following 30-day tombstone window and separate
+  resolution evidence. Identity/fingerprint/retention boundaries are immutable.
+- `outbox_events`: optional durable publication records, with an unpublished
+  index. This schema does not mandate a duplicate job-publication hop.
+- `context_assembly_records`: selected source IDs, token budgets, policy versions
+  and degradation/truncation diagnostics; no assembled prompt or memory text.
+- `deletion_controls`: restricted account-purge control metadata and established
+  journal/fence identity, with approved lifecycle states. PostgreSQL metadata is
+  **not** the independently durable restoration journal; T35/T37 must implement
+  that journal, verified fencing/purge and replay before service exposure.
+
+Every table has ENABLE + FORCE RLS and composite owner foreign keys for live
+relational references. Operation response IDs are historical evidence: the
+acceptance trigger verifies their owned source rows and makes identities
+immutable, without FKs that would prevent retention after source deletion. A
+retained response ID never grants access to the original resource. API and
+worker privileges are explicit; neither gets DDL, DELETE,
+TRUNCATE, owner membership or routine EXECUTE. API cannot claim/finalize runs or
+jobs. Auth/maintenance have no direct runtime table access. No runtime role gets
+direct writes to deletion controls. Restricted cross-user discovery, purge and
+cleanup interfaces belong to later tasks, not an RLS bypass in V005.
+
+Standalone input is temporary `input_text`, limited to 1 MiB UTF-8 and permitted
+only on standalone runs. It is protected by forced tenant RLS and explicit table
+privileges; API/worker roles cannot rewrite it. Per approved architecture section
+10, encryption at rest is provided by encrypted host volumes and backups, without
+application field-level encryption or application-managed input keys. This
+schema/test suite does not provision or verify host/backup encryption. Prompts
+must remain absent from logs, diagnostics and operation lookup responses.
+T21/T23 own bounded input retention and cleanup services; no new input TTL is
+selected here. Completed standalone results expire exactly 168 hours after
+completion. Expired result/input/checkpoint erasure can preserve run
+and ledger identity through an artifact-purge marker; only privileged schema
+tests can exercise that shape today. No runtime cleanup privilege or worker is
+installed. Unsuccessful checkpoint retention and explicit inference retry remain
+unresolved by the approved T05 clarification; V005 invents no TTL/replay policy
+for them. T21/T23 own retention services. Unresolved operation evidence has no
+cleanup eligibility until resolution, even after the tombstone boundary.
+
+Lease columns and state guards are storage prerequisites, not an implementation
+of the T16/T32 executor/queue protocol. Trusted services must use expected state,
+token/generation and lease validity predicates in their UPDATE statements.
+Tests exercise competing SQL claims, stale-token no-ops, terminal races and
+expiry/reconciliation; they do not establish safety of a future service. Lease
+duration (2m), heartbeat cadence (30s), FIFO selection and retry backoff (5s capped
+at 5m) remain T32 behavior. No automatic inference replay or Mem0 call occurs.
+T12/T16/T33 retain atomic submission/finalization/enqueue and ingestion services.
+
+`make database-check` includes fresh/repeat/restart V001–V005, V004-to-V005
+upgrade with a retained branch archive, deliberately failed migration
+rollback/recovery, checksum drift, actual runtime roles, RLS on/off/missing scope,
+constraints, negative/boundary cases and competing PostgreSQL transactions.
+The tests use only unique labelled disposable stacks. See the T07 PR for actual
+commands/results and reviewed SHA; no public API/E2E acceptance is implied.
+
+If unapplied V005 fails: keep serving closed, confirm V001–V004 history and data
+are unchanged and runtime objects/grants/functions rolled back; review/correct
+only the unapplied candidate, explicitly rerun migrate, then validate. After a
+successful V005, a Git revert is not a database rollback. Use separately approved
+forward SQL or a coordinated offline restore of compatible archive/provider
+stores with independent deletion-journal replay before reopening (T37). Never
+edit applied SQL, run Flyway clean/repair/baseline/out-of-order migration, or
+delete retained volumes. V005 installs no down migration or destructive recovery.
+
+PR #9 review R1 corrects the candidate standalone-input storage contract to the
+approved host-volume/backup encryption baseline. The owner approved this plan;
+the local Docker container/volume inventories were empty before correction, and
+recorded V005 applications were in disposable test stacks. Only the unmerged
+candidate is revised. Recreate owned disposable stacks from the corrected SQL;
+never repair an old candidate checksum for reuse. If V005 has been applied to a
+retained database, preserve its migration history and obtain separate approval
+for a forward migration instead of applying this revised candidate over it.

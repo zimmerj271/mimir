@@ -15,6 +15,28 @@ Examples to seed the matrix (not test-pass claims): auth/session renewal → T24
 
 ## Complete acceptance ownership seed (not test execution evidence)
 
+T07 runtime storage coverage → `tests/integration/test_database.py`
+(`test_t07_*`), real PostgreSQL 18/Flyway. Tests cover fresh/repeat/restart
+V001–V005; V004 upgrade with retained branch history; deliberate failed V005
+rollback/recovery and checksum drift; forced RLS, missing context, row-security-off
+failure and actual role grants on all runtime tables; run shapes/owned messages,
+one active conversation run, terminal/checkpoint constraints, attempts, exact
+successful ingestion pairs, duplicate delivery rejection, competing SQL claims,
+per-user ingestion serialization, stale token predicates, lease/reconciliation
+shape, attempt bounds, typed operation identities and retention/resolution
+boundaries, standalone UTF-8 input/result limits, temporary-input owner isolation
+and runtime write denial, and expired-artifact storage shape with input erasure.
+This supports DB-01/DB-02/DB-06 and DB-MIG-01; DB-ROLE-01, JOB-01/JOB-02,
+RUN-STAND-01/RUN-STAND-02, OP-LOOKUP-01/OP-LOOKUP-02 and SEC-01 receive only
+storage/protocol support. Executor/queue/HTTP services, actual lifecycle cleanup,
+independent deletion journal/replay, full purge and provider effects remain later
+tasks. No normative ownership/status is changed. SQL protocol probes do not prove
+the behavior of future production services. The T07 PR records literal command
+results, limitations and exact submitted SHA; no public contract has changed.
+PR #9 R1 restores architecture section 10's host-volume/backup encryption baseline
+without application field encryption or key management. Encryption of host
+volumes/backups is not verified by these PostgreSQL storage tests.
+
 T06 supporting branch-storage coverage → `tests/integration/test_database.py`
 (`test_t06_*`), real PostgreSQL 18/Flyway. DB-04 covers flattened nested prefixes,
 exact inherited revision references, both approved branch boundaries, empty

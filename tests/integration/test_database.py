@@ -1,7 +1,7 @@
-"""T03–T06 real PostgreSQL 18/Flyway tests, never skip a missing daemon.
+"""T03–T07 real PostgreSQL 18/Flyway tests, never skip a missing daemon.
 
 All fixtures use unique labelled disposable volumes. T03 fixtures stop at V001;
-T04–T06 exercise real V002–V004 on fresh and upgrade paths.
+T04–T07 exercise real V002–V005 on fresh and upgrade paths.
 """
 
 import concurrent.futures
@@ -2869,3 +2869,1115 @@ def test_t06_branch_and_parent_delete_preserve_foreign_keys(branch_rows):
         assert branch_result.returncode == 0
         assert remaining == "2"
         assert rows.visible(child) == [f"1|{rows.message}|{rows.revision}"]
+
+
+V005 = "V005__runtime_jobs_and_operations.sql"
+RUNTIME_TABLES = (
+    "model_runs",
+    "model_run_attempts",
+    "jobs",
+    "memory_ingestions",
+    "operation_ledger",
+    "outbox_events",
+    "context_assembly_records",
+    "deletion_controls",
+)
+
+
+class RuntimeRows(ArchiveRows):
+    """SQL protocol probes for T07 storage, not a production queue/executor."""
+
+    def __init__(self, database):
+        super().__init__(database)
+        self.run = str(uuid.uuid7())
+        self.job = str(uuid.uuid7())
+        self.token = str(uuid.uuid4())
+
+    def run_sql(self, run=None, kind="conversation", extra_columns="", extra_values=""):
+        conversation = f"'{self.conversation}'" if kind == "conversation" else "NULL"
+        message = f"'{self.message}'" if kind == "conversation" else "NULL"
+        return f"""
+            INSERT INTO runtime.model_runs(run_id,user_id,kind,conversation_id,input_message_id,
+                model_config_id{extra_columns}) VALUES ('{run or self.run}','{self.user}',
+                '{kind}',{conversation},{message},'synthetic-model'{extra_values})
+        """
+
+    def job_sql(self, job=None, job_type="memory_ingest"):
+        return f"""
+            INSERT INTO runtime.jobs(job_id,user_id,job_type)
+                VALUES ('{job or self.job}','{self.user}','{job_type}')
+        """
+
+    def running_sql(self, run=None, token=None, generation=1):
+        return f"""
+            UPDATE runtime.model_runs SET status='running',started_at=created_at,
+                execution_token='{token or self.token}',execution_generation={generation},
+                lease_expires_at=clock_timestamp()+interval '2 minutes'
+                WHERE run_id='{run or self.run}'
+        """
+
+    def finish_sql(self, outcome="cancelled", run=None, extra=""):
+        return f"""
+            UPDATE runtime.model_runs SET status='{outcome}',completed_at=clock_timestamp(),
+                execution_token=NULL,lease_expires_at=NULL {extra}
+                WHERE run_id='{run or self.run}'
+        """
+
+    def operation_sql(self, key="synthetic-key", run=None, kind="message_submit"):
+        standalone = kind == "standalone_submit"
+        conversation = "NULL" if standalone else f"'{self.conversation}'"
+        message = "NULL" if standalone else f"'{self.message}'"
+        version = "NULL" if standalone else "1"
+        return f"""
+            INSERT INTO runtime.operation_ledger(user_id,operation_type,idempotency_key,
+                request_fingerprint,run_id,conversation_id,message_id,conversation_version,
+                retained_until,tombstone_until) VALUES ('{self.user}','{kind}','{key}',
+                sha256('synthetic fingerprint'::bytea),'{run or self.run}',{conversation},
+                {message},{version},CURRENT_TIMESTAMP+interval '720 hours',
+                CURRENT_TIMESTAMP+interval '1440 hours')
+        """
+
+    def claim_sql(self, token=None, predicate=None):
+        return f"""
+            WITH next AS (SELECT job_id FROM runtime.jobs
+                WHERE user_id='{self.user}' AND status IN ('pending','retry_wait')
+                    AND available_at <= clock_timestamp() {predicate or ""}
+                ORDER BY created_at,job_id FOR UPDATE SKIP LOCKED LIMIT 1)
+            UPDATE runtime.jobs j SET status='running',lease_token='{token or self.token}',
+                lease_generation=lease_generation+1,attempt_count=attempt_count+1,
+                heartbeat_at=clock_timestamp(),lease_expires_at=clock_timestamp()+interval '2 minutes'
+                FROM next WHERE j.job_id=next.job_id RETURNING j.job_id
+        """
+
+    def success_sql(self):
+        assistant, revision = str(uuid.uuid7()), str(uuid.uuid7())
+        return (
+            self.message_sql(2, assistant, revision, role="assistant")
+            + ";"
+            + self.finish_sql(
+                "completed", extra=f",assistant_message_id='{assistant}'"
+            ),
+            revision,
+        )
+
+    def ingestion_sql(self, assistant_revision, job=None):
+        return f"""
+            INSERT INTO runtime.memory_ingestions(ingestion_id,user_id,job_id,run_id,
+                conversation_id,project_id,user_revision_id,assistant_revision_id,
+                provider_config_id,committed_at) VALUES ('{uuid.uuid7()}','{self.user}',
+                '{job or self.job}','{self.run}','{self.conversation}','{self.project}',
+                '{self.revision}','{assistant_revision}','synthetic-memory',CURRENT_TIMESTAMP)
+        """
+
+
+@pytest.fixture(scope="module")
+def runtime_database(tmp_path_factory):
+    stack = DatabaseStack(
+        tmp_path_factory.mktemp("runtime-database"), through_version=5
+    )
+    try:
+        stack.start()
+        stack.migrate()
+        yield stack
+    finally:
+        stack.cleanup()
+
+
+@pytest.fixture
+def runtime_rows(runtime_database):
+    rows = RuntimeRows(runtime_database)
+    rows.seed()
+    rows.actor(rows.run_sql() + ";" + rows.job_sql())
+    return rows
+
+
+def test_t07_fresh_repeat_validate_restart_catalog(runtime_rows):
+    rows = runtime_rows
+    database = rows.database
+    history_sql = "SELECT version,checksum,success FROM public.flyway_schema_history ORDER BY installed_rank"
+    history = database.sql(history_sql).stdout
+    assert [line.split("|")[0] for line in history.splitlines()] == [
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+    ]
+    assert database.sql("SHOW server_version_num").stdout.startswith("18")
+    database.migrate()
+    database.flyway("validate")
+    database.compose("restart", "postgres")
+    database.compose("up", "-d", "--wait", "postgres")
+    database.flyway("validate")
+    assert database.sql(history_sql).stdout == history
+    tables = database.sql("""
+        SELECT relname,pg_get_userbyid(relowner),relrowsecurity,relforcerowsecurity
+        FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='runtime' AND relkind='r' ORDER BY relname
+    """).stdout.splitlines()
+    assert tables == [f"{name}|mimir_owner|t|t" for name in sorted(RUNTIME_TABLES)]
+    indexes = database.sql("""
+        SELECT indexname FROM pg_indexes WHERE schemaname='runtime'
+            AND indexname IN ('model_runs_one_active_conversation','model_runs_pending',
+                'model_runs_leases','model_runs_expiry','model_run_attempts_one_open',
+                'jobs_claimable','jobs_owner_fifo','jobs_expired_leases',
+                'operation_ledger_cleanup','outbox_events_unpublished')
+    """).stdout.splitlines()
+    assert len(indexes) == 10
+    assert (
+        database.sql("""
+        SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='runtime' AND (p.prosecdef OR EXISTS
+            (SELECT FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+                WHERE a.grantee=0 AND a.privilege_type='EXECUTE'))
+    """).stdout.strip()
+        == "0"
+    )
+    assert (
+        rows.actor(
+            f"SELECT status FROM runtime.model_runs WHERE run_id='{rows.run}'"
+        ).stdout.strip()
+        == "pending"
+    )
+
+
+def test_t07_upgrade_rollback_recovery_and_checksum_drift(tmp_path):
+    database = DatabaseStack(tmp_path, through_version=4)
+    try:
+        database.start()
+        database.migrate()
+        rows = BranchRows(database)
+        rows.seed()
+        child = rows.create_branch()
+        visible = rows.visible(child)
+        history_sql = "SELECT version,checksum FROM public.flyway_schema_history ORDER BY installed_rank"
+        history = database.sql(history_sql).stdout
+        candidate = database.migrations / V005
+        original = (ROOT / "backend/migrations" / V005).read_bytes()
+        candidate.write_bytes(original + b"\nSELECT 1/0;\n")
+        assert database.flyway("migrate", check=False).returncode != 0
+        assert database.sql(history_sql).stdout == history
+        assert (
+            database.sql("""
+            SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+                WHERE n.nspname='runtime'
+        """).stdout.strip()
+            == "0"
+        )
+        assert (
+            database.sql(
+                "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='runtime'"
+            ).stdout.strip()
+            == "0"
+        )
+        candidate.write_bytes(original)
+        database.flyway("migrate")
+        database.flyway("validate")
+        assert database.sql(history_sql + " LIMIT 4").stdout == history
+        assert rows.visible(child) == visible
+        try:
+            candidate.write_bytes(original + b"\nSELECT 12345;\n")
+            failed = database.flyway("validate", check=False)
+            assert (
+                failed.returncode != 0
+                and "checksum" in (failed.stdout + failed.stderr).lower()
+            )
+            assert database.flyway("migrate", check=False).returncode != 0
+        finally:
+            candidate.write_bytes(original)
+        database.flyway("validate")
+    finally:
+        database.cleanup()
+
+
+def test_t07_active_run_uniqueness_competing_transactions(runtime_rows):
+    rows = runtime_rows
+    assert rows.actor(rows.run_sql(str(uuid.uuid7())), check=False).returncode != 0
+    rows.actor(rows.finish_sql(), role="worker")
+    barrier = threading.Barrier(2)
+
+    def submit():
+        barrier.wait(timeout=15)
+        return rows.actor(rows.run_sql(str(uuid.uuid7())), check=False)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        results = [
+            future.result() for future in [pool.submit(submit), pool.submit(submit)]
+        ]
+    assert sorted(result.returncode == 0 for result in results) == [False, True]
+    assert "unique constraint" in next(
+        result.stderr for result in results if result.returncode
+    )
+
+
+def test_t07_standalone_parallel_runs_and_protected_input(runtime_rows):
+    rows = runtime_rows
+    before = rows.actor(
+        "SELECT count(*) FROM archive.messages; SELECT count(*) FROM archive.conversations"
+    ).stdout
+    standalone = str(uuid.uuid7())
+    rows.actor(
+        rows.run_sql(
+            standalone,
+            "standalone",
+            ",input_text",
+            ",'synthetic prompt'",
+        )
+        + ";"
+        + rows.run_sql(str(uuid.uuid7()), "standalone")
+    )
+    assert (
+        rows.actor(
+            f"SELECT input_text='synthetic prompt' FROM runtime.model_runs WHERE run_id='{standalone}'"
+        ).stdout.strip()
+        == "t"
+    )
+    rows.actor(rows.running_sql(standalone), role="worker")
+    # Use one timestamp for exact completed_at/expiry, as a future finalizer must.
+    rows.actor(
+        f"""
+        UPDATE runtime.model_runs SET status='completed',completed_at=CURRENT_TIMESTAMP,
+            execution_token=NULL,lease_expires_at=NULL,final_text='synthetic result',
+            result_expires_at=CURRENT_TIMESTAMP+interval '168 hours' WHERE run_id='{standalone}'
+    """,
+        role="worker",
+    )
+    assert (
+        rows.actor(
+            "SELECT count(*) FROM archive.messages; SELECT count(*) FROM archive.conversations"
+        ).stdout
+        == before
+    )
+    assert (
+        rows.actor("SELECT count(*) FROM runtime.memory_ingestions").stdout.strip()
+        == "0"
+    )
+    assert (
+        rows.actor(
+            f"SELECT result_expires_at-completed_at FROM runtime.model_runs WHERE run_id='{standalone}'"
+        ).stdout.strip()
+        == "7 days"
+    )
+
+
+@pytest.mark.parametrize("characters,accepted", ((524288, True), (524289, False)))
+def test_t07_standalone_input_utf8_limit(runtime_rows, characters, accepted):
+    rows = runtime_rows
+    run = str(uuid.uuid7())
+    result = rows.actor(
+        rows.run_sql(run, "standalone", ",input_text", f",repeat('é',{characters})"),
+        check=False,
+    )
+    assert (result.returncode == 0) is accepted
+    if accepted:
+        assert (
+            rows.actor(
+                f"SELECT octet_length(convert_to(input_text,'UTF8')) FROM runtime.model_runs WHERE run_id='{run}'"
+            ).stdout.strip()
+            == "1048576"
+        )
+    else:
+        assert (
+            rows.actor(
+                f"SELECT count(*) FROM runtime.model_runs WHERE run_id='{run}'"
+            ).stdout.strip()
+            == "0"
+        )
+
+
+@pytest.mark.parametrize("role", ("api", "worker"))
+def test_t07_standalone_input_scope_and_runtime_write_denial(runtime_rows, role):
+    rows = runtime_rows
+    run = str(uuid.uuid7())
+    rows.actor(rows.run_sql(run, "standalone", ",input_text", ",'synthetic prompt'"))
+    other = RuntimeRows(rows.database)
+    other.seed()
+    query = f"SELECT count(*) FROM runtime.model_runs WHERE run_id='{run}' AND input_text IS NOT NULL"
+    assert rows.actor(query, role=role).stdout.strip() == "1"
+    assert other.actor(query, role=role).stdout.strip() == "0"
+    # Reuse the same real connection across COMMIT; no prompt text is emitted.
+    assert rows.database.sql(
+        f"BEGIN; SET LOCAL app.current_user_id='{rows.user}'; {query}; COMMIT; {query}",
+        f"mimir_{role}",
+    ).stdout.splitlines() == ["1", "0"]
+    assert (
+        rows.actor(
+            f"UPDATE runtime.model_runs SET input_text='changed' WHERE run_id='{run}'",
+            role=role,
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert rows.database.sql("""
+        SELECT column_name,data_type FROM information_schema.columns
+        WHERE table_schema='runtime' AND table_name='model_runs'
+            AND column_name IN ('input_text','input_ciphertext','input_key_id')
+        ORDER BY column_name
+    """).stdout.splitlines() == ["input_text|text"]
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "kind",
+        "missing_input",
+        "standalone_conversation",
+        "wrong_conversation",
+        "assistant_input",
+        "standalone_input_on_conversation",
+        "initial_terminal",
+    ),
+)
+def test_t07_invalid_run_shapes_and_message_roles(runtime_rows, fault):
+    rows = runtime_rows
+    rows.actor(rows.finish_sql(), role="worker")
+    sql = rows.run_sql(str(uuid.uuid7()))
+    if fault == "kind":
+        sql = sql.replace("'conversation'", "'unknown'")
+    elif fault == "missing_input":
+        sql = sql.replace(f"'{rows.message}'", "NULL")
+    elif fault == "standalone_conversation":
+        sql = sql.replace("'conversation'", "'standalone'")
+    elif fault == "wrong_conversation":
+        other = str(uuid.uuid7())
+        rows.actor(
+            f"INSERT INTO archive.conversations(conversation_id,user_id,title) VALUES ('{other}','{rows.user}','synthetic')"
+        )
+        sql = sql.replace(f"'{rows.conversation}'", f"'{other}'")
+    elif fault == "assistant_input":
+        message = str(uuid.uuid7())
+        rows.actor(rows.message_sql(2, message=message, role="assistant"))
+        sql = sql.replace(f"'{rows.message}'", f"'{message}'")
+    elif fault == "standalone_input_on_conversation":
+        sql = rows.run_sql(
+            str(uuid.uuid7()),
+            extra_columns=",input_text",
+            extra_values=",'synthetic prompt'",
+        )
+    else:
+        sql = rows.run_sql(
+            str(uuid.uuid7()), extra_columns=",status", extra_values=",'completed'"
+        )
+    assert rows.actor(sql, check=False).returncode != 0
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "unclaimed",
+        "skip_running",
+        "sequence",
+        "new_token_same_generation",
+        "backwards_state",
+        "no_assistant",
+        "standalone_expiry",
+    ),
+)
+def test_t07_run_state_checkpoint_and_fencing_constraints(runtime_rows, fault):
+    rows = runtime_rows
+    if fault in ("unclaimed", "skip_running"):
+        sql = (
+            "status='running'"
+            if fault == "unclaimed"
+            else "status='completed',completed_at=CURRENT_TIMESTAMP"
+        )
+    else:
+        rows.actor(rows.running_sql(), role="worker")
+        rows.actor(
+            f"UPDATE runtime.model_runs SET checkpoint_text='synthetic partial',checkpoint_sequence=1 WHERE run_id='{rows.run}'",
+            role="worker",
+        )
+        sql = {
+            "sequence": "checkpoint_text='changed',checkpoint_sequence=1",
+            "new_token_same_generation": f"execution_token='{uuid.uuid4()}'",
+            "backwards_state": "status='pending',execution_token=NULL,lease_expires_at=NULL",
+            "no_assistant": "status='completed',completed_at=CURRENT_TIMESTAMP,execution_token=NULL,lease_expires_at=NULL",
+            "standalone_expiry": "result_expires_at=CURRENT_TIMESTAMP",
+        }[fault]
+    assert (
+        rows.actor(
+            f"UPDATE runtime.model_runs SET {sql} WHERE run_id='{rows.run}'",
+            role="worker",
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+def test_t07_successful_pair_ingestion_atomicity_and_deduplication(runtime_rows):
+    rows = runtime_rows
+    rows.actor(rows.running_sql(), role="worker")
+    success, revision = rows.success_sql()
+    failed = rows.actor(
+        success + ";" + rows.ingestion_sql(revision) + ";SELECT 1/0",
+        role="worker",
+        check=False,
+    )
+    assert failed.returncode != 0
+    assert rows.actor(
+        f"SELECT status FROM runtime.model_runs WHERE run_id='{rows.run}'; SELECT count(*) FROM archive.messages WHERE conversation_id='{rows.conversation}'"
+    ).stdout.splitlines() == ["running", "1"]
+    rows.actor(success + ";" + rows.ingestion_sql(revision), role="worker")
+    duplicate_job = str(uuid.uuid7())
+    rows.actor(rows.job_sql(duplicate_job))
+    assert (
+        rows.actor(
+            rows.ingestion_sql(revision, duplicate_job), role="worker", check=False
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.actor(rows.finish_sql("failed"), role="worker", check=False).returncode
+        != 0
+    )
+    assert (
+        rows.actor(
+            f"UPDATE runtime.model_runs SET checkpoint_text='rewrite',checkpoint_sequence=1 WHERE run_id='{rows.run}'",
+            role="worker",
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+@pytest.mark.parametrize("fault", ("wrong_pair", "wrong_job_type"))
+def test_t07_ingestion_cannot_bypass_exact_pair_or_serial_job_type(runtime_rows, fault):
+    rows = runtime_rows
+    rows.actor(rows.running_sql(), role="worker")
+    success, revision = rows.success_sql()
+    rows.actor(success, role="worker")
+    if fault == "wrong_pair":
+        sql = rows.ingestion_sql(rows.revision)
+    else:
+        job = str(uuid.uuid7())
+        rows.actor(rows.job_sql(job, "synthetic"))
+        sql = rows.ingestion_sql(revision, job)
+    result = rows.actor(sql, role="worker", check=False)
+    assert result.returncode != 0 and "ingestion requires" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "outcome", ("pending", "cancelled", "failed", "interrupted", "standalone")
+)
+def test_t07_ineligible_ingestion_sources_rejected(runtime_rows, outcome):
+    rows = runtime_rows
+    if outcome == "standalone":
+        rows.actor(rows.finish_sql(), role="worker")
+        rows.run = str(uuid.uuid7())
+        rows.actor(rows.run_sql(kind="standalone"))
+    elif outcome != "pending":
+        rows.actor(rows.finish_sql(outcome), role="worker")
+    assert (
+        rows.actor(
+            rows.ingestion_sql(rows.revision), role="worker", check=False
+        ).returncode
+        != 0
+    )
+
+
+def test_t07_attempt_identity_usage_and_terminal_evidence(runtime_rows):
+    rows = runtime_rows
+    rows.actor(rows.running_sql(), role="worker")
+    attempt = str(uuid.uuid7())
+    insert = f"""
+        INSERT INTO runtime.model_run_attempts(attempt_id,user_id,run_id,attempt_number,
+            execution_generation,execution_token,provider_config_id) VALUES
+            ('{attempt}','{rows.user}','{rows.run}',1,1,'{rows.token}','synthetic-provider')
+    """
+    rows.actor(insert, role="worker")
+    assert (
+        rows.actor(
+            insert.replace(attempt, str(uuid.uuid7())).replace(",1,1,", ",2,1,"),
+            role="worker",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.actor(
+            f"UPDATE runtime.model_run_attempts SET output_tokens=-1 WHERE attempt_id='{attempt}'",
+            role="worker",
+            check=False,
+        ).returncode
+        != 0
+    )
+    rows.actor(
+        f"UPDATE runtime.model_run_attempts SET output_visible=true,outcome='interrupted',completed_at=CURRENT_TIMESTAMP WHERE attempt_id='{attempt}'",
+        role="worker",
+    )
+    assert (
+        rows.actor(
+            f"UPDATE runtime.model_run_attempts SET outcome='completed' WHERE attempt_id='{attempt}'",
+            role="worker",
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+def test_t07_competing_skip_locked_claims_and_stale_job_token(runtime_rows):
+    rows = runtime_rows
+    rows.job = str(uuid.uuid7())
+    second_job = str(uuid.uuid7())
+    rows.actor(
+        rows.job_sql(job_type="synthetic") + ";" + rows.job_sql(second_job, "synthetic")
+    )
+    barrier = threading.Barrier(2)
+
+    def claim():
+        barrier.wait(timeout=15)
+        # Hold row locks long enough for the competing worker to skip them.
+        return rows.actor(
+            rows.claim_sql(str(uuid.uuid4()), "AND job_type='synthetic'")
+            + ";SELECT pg_sleep(0.2)",
+            role="worker",
+        ).stdout.strip()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        results = [
+            future.result() for future in [pool.submit(claim), pool.submit(claim)]
+        ]
+    assert {result.splitlines()[0] for result in results} == {rows.job, second_job}
+    old_token = rows.actor(
+        f"SELECT lease_token FROM runtime.jobs WHERE job_id='{rows.job}'"
+    ).stdout.strip()
+    rows.actor(
+        f"""
+        UPDATE runtime.jobs SET heartbeat_at=CURRENT_TIMESTAMP-interval '3 minutes',
+            lease_expires_at=CURRENT_TIMESTAMP-interval '1 minute' WHERE job_id='{rows.job}';
+        UPDATE runtime.jobs SET status='reconciliation_required',lease_token=NULL,
+            lease_expires_at=NULL,heartbeat_at=NULL
+            WHERE job_id='{rows.job}' AND lease_expires_at < CURRENT_TIMESTAMP;
+    """,
+        role="worker",
+    )
+    # Unknown external outcomes cannot be directly reclaimed as retry_wait/running.
+    assert (
+        rows.actor(
+            f"UPDATE runtime.jobs SET status='retry_wait' WHERE job_id='{rows.job}'",
+            role="worker",
+            check=False,
+        ).returncode
+        != 0
+    )
+    rows.actor(
+        f"UPDATE runtime.jobs SET status='pending' WHERE job_id='{rows.job}'",
+        role="worker",
+    )
+    rows.actor(rows.claim_sql(predicate=f"AND job_id='{rows.job}'"), role="worker")
+    finish = f"""
+        UPDATE runtime.jobs SET status='completed',completed_at=CURRENT_TIMESTAMP,
+            lease_token=NULL,lease_expires_at=NULL,heartbeat_at=NULL
+            WHERE job_id='{rows.job}' AND status='running' AND lease_token='{{token}}'
+            RETURNING job_id
+    """
+    assert (
+        rows.actor(finish.format(token=old_token), role="worker").stdout.strip() == ""
+    )
+    assert (
+        rows.actor(finish.format(token=rows.token), role="worker").stdout.strip()
+        == rows.job
+    )
+    assert (
+        rows.actor(
+            f"UPDATE runtime.jobs SET status='pending',completed_at=NULL WHERE job_id='{rows.job}'",
+            role="worker",
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+def test_t07_job_attempt_bound_and_retry_lease_shape(runtime_rows):
+    rows = runtime_rows
+    for count in range(1, 6):
+        token = str(uuid.uuid4())
+        rows.actor(rows.claim_sql(token), role="worker")
+        assert rows.actor(
+            f"SELECT attempt_count FROM runtime.jobs WHERE job_id='{rows.job}'"
+        ).stdout.strip() == str(count)
+        rows.actor(
+            f"UPDATE runtime.jobs SET status='retry_wait',lease_token=NULL,lease_expires_at=NULL,heartbeat_at=NULL WHERE job_id='{rows.job}'",
+            role="worker",
+        )
+    assert (
+        rows.actor(
+            rows.claim_sql(str(uuid.uuid4())), role="worker", check=False
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.actor(
+            f"UPDATE runtime.jobs SET lease_token='{uuid.uuid4()}' WHERE job_id='{rows.job}'",
+            role="worker",
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+def test_t07_operation_replay_identity_race_and_retention(runtime_rows):
+    rows = runtime_rows
+    barrier = threading.Barrier(2)
+
+    def accept():
+        barrier.wait(timeout=15)
+        return rows.actor(rows.operation_sql(), check=False)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        results = [
+            future.result() for future in [pool.submit(accept), pool.submit(accept)]
+        ]
+    assert sorted(result.returncode == 0 for result in results) == [False, True]
+    assert (
+        rows.actor(
+            f"SELECT run_id,conversation_id,retained_until-accepted_at,tombstone_until-retained_until,resolved_at IS NULL FROM runtime.operation_ledger WHERE user_id='{rows.user}'"
+        ).stdout.strip()
+        == f"{rows.run}|{rows.conversation}|30 days|30 days|t"
+    )
+    for assignment in (
+        "request_fingerprint=sha256('changed'::bytea)",
+        "retained_until=retained_until+interval '1 day'",
+        f"run_id='{uuid.uuid7()}'",
+    ):
+        assert (
+            rows.owner(
+                f"UPDATE runtime.operation_ledger SET {assignment} WHERE user_id='{rows.user}'",
+                check=False,
+            ).returncode
+            != 0
+        )
+    # Replay can query the same fingerprint/identity without storing prompt bodies.
+    assert (
+        rows.actor(
+            f"SELECT run_id FROM runtime.operation_ledger WHERE user_id='{rows.user}' AND request_fingerprint=sha256('synthetic fingerprint'::bytea)"
+        ).stdout.strip()
+        == rows.run
+    )
+    assert (
+        rows.actor(
+            f"SELECT run_id FROM runtime.operation_ledger WHERE user_id='{rows.user}' AND request_fingerprint=sha256('changed'::bytea)"
+        ).stdout.strip()
+        == ""
+    )
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "short_key",
+        "long_key",
+        "invalid_key",
+        "unknown_type",
+        "short_hash",
+        "bad_retention",
+        "wrong_run_kind",
+    ),
+)
+def test_t07_operation_identity_boundaries(runtime_rows, fault):
+    rows = runtime_rows
+    sql = rows.operation_sql()
+    if fault == "short_key":
+        sql = sql.replace("synthetic-key", "short")
+    elif fault == "long_key":
+        sql = sql.replace("synthetic-key", "x" * 129)
+    elif fault == "invalid_key":
+        sql = sql.replace("synthetic-key", "invalid key")
+    elif fault == "unknown_type":
+        sql = sql.replace("message_submit", "unknown")
+    elif fault == "short_hash":
+        sql = sql.replace("sha256('synthetic fingerprint'::bytea)", "'short'::bytea")
+    elif fault == "bad_retention":
+        sql = sql.replace("720 hours", "721 hours")
+    else:
+        sql = rows.operation_sql(kind="standalone_submit")
+    assert rows.actor(sql, check=False).returncode != 0
+
+
+@pytest.mark.parametrize("role", ("api", "worker"))
+def test_t07_all_operational_tables_rls_context_and_owner_integrity(runtime_rows, role):
+    rows = runtime_rows
+    other = RuntimeRows(rows.database)
+    other.seed()
+    other.actor(other.run_sql() + ";" + other.job_sql())
+    rows.actor(rows.operation_sql())
+    rows.owner(
+        f"INSERT INTO runtime.deletion_controls(deletion_id,user_id) VALUES ('{uuid.uuid7()}','{rows.user}')"
+    )
+    rows.actor(rows.running_sql(), role="worker")
+    success, revision = rows.success_sql()
+    rows.actor(success + ";" + rows.ingestion_sql(revision), role="worker")
+    rows.actor(
+        f"""
+        INSERT INTO runtime.model_run_attempts(attempt_id,user_id,run_id,attempt_number,
+            execution_generation,execution_token,provider_config_id) VALUES
+            ('{uuid.uuid7()}','{rows.user}','{rows.run}',1,1,'{rows.token}','synthetic');
+        INSERT INTO runtime.outbox_events(event_id,user_id,event_type,event_version,payload)
+            VALUES ('{uuid.uuid7()}','{rows.user}','synthetic',1,'{{}}');
+        INSERT INTO runtime.context_assembly_records(context_id,user_id,run_id,policy_version,
+            model_policy_version,estimated_input_tokens,reserved_output_tokens,budget_mode)
+            VALUES ('{uuid.uuid7()}','{rows.user}','{rows.run}','synthetic','synthetic',1,1,'synthetic')
+    """,
+        role="worker",
+    )
+    for table in RUNTIME_TABLES:
+        assert (
+            int(
+                rows.actor(
+                    f"SELECT count(*) FROM runtime.{table}", role=role
+                ).stdout.strip()
+            )
+            >= 1
+        )
+        assert (
+            other.actor(
+                f"SELECT count(*) FROM runtime.{table} WHERE user_id='{rows.user}'",
+                role=role,
+            ).stdout.strip()
+            == "0"
+        )
+        assert (
+            rows.database.sql(
+                f"BEGIN; SELECT count(*) FROM runtime.{table}; COMMIT", f"mimir_{role}"
+            ).stdout.strip()
+            == "0"
+        )
+        assert (
+            rows.database.sql(
+                f"BEGIN; SET LOCAL row_security=off; SELECT * FROM runtime.{table}; COMMIT",
+                f"mimir_{role}",
+                check=False,
+            ).returncode
+            != 0
+        )
+    # Same-user actor with a foreign user's run/job references is rejected too.
+    assert (
+        rows.actor(
+            rows.operation_sql(key="foreign-key", run=other.run), check=False
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.actor(
+            rows.ingestion_sql(revision, job=other.job), role="worker", check=False
+        ).returncode
+        != 0
+    )
+    forged = rows.job_sql(str(uuid.uuid7())).replace(rows.user, other.user)
+    assert rows.actor(forged, role=role, check=False).returncode != 0
+    assert rows.database.sql(
+        f"BEGIN; SET LOCAL app.current_user_id='{rows.user}'; SELECT count(*) FROM runtime.jobs; COMMIT; SELECT count(*) FROM runtime.jobs",
+        f"mimir_{role}",
+    ).stdout.splitlines() == ["1", "0"]
+
+
+@pytest.mark.parametrize("role", ("api", "worker", "auth", "maintenance"))
+def test_t07_least_privilege_and_no_unrestricted_purge(runtime_rows, role):
+    rows = runtime_rows
+    for table in RUNTIME_TABLES:
+        for operation in (
+            f"DELETE FROM runtime.{table}",
+            f"TRUNCATE runtime.{table}",
+            f"ALTER TABLE runtime.{table} DISABLE ROW LEVEL SECURITY",
+        ):
+            assert rows.actor(operation, role=role, check=False).returncode != 0
+    if role in ("auth", "maintenance"):
+        for table in RUNTIME_TABLES:
+            assert (
+                rows.actor(
+                    f"SELECT * FROM runtime.{table}", role=role, check=False
+                ).returncode
+                != 0
+            )
+    if role == "api":
+        assert rows.actor(rows.running_sql(), check=False).returncode != 0
+    assert (
+        rows.actor(
+            f"INSERT INTO runtime.deletion_controls(deletion_id,user_id) VALUES ('{uuid.uuid7()}','{rows.user}')",
+            role=role,
+            check=False,
+        ).returncode
+        != 0
+    )
+    for routine in (
+        "guard_run",
+        "guard_job",
+        "guard_attempt",
+        "guard_operation",
+        "require_ingestion_source",
+    ):
+        assert (
+            rows.actor(f"SELECT runtime.{routine}()", role=role, check=False).returncode
+            != 0
+        )
+
+
+def test_t07_standalone_expiry_preserves_ledger_identity_and_fails_closed(runtime_rows):
+    rows = runtime_rows
+    run = str(uuid.uuid7())
+    rows.actor(
+        rows.run_sql(
+            run,
+            "standalone",
+            ",created_at,input_text",
+            ",CURRENT_TIMESTAMP-interval '9 days','synthetic prompt'",
+        )
+    )
+    rows.actor(rows.operation_sql(run=run, kind="standalone_submit"))
+    rows.actor(rows.running_sql(run), role="worker")
+    rows.actor(
+        f"""
+        UPDATE runtime.model_runs SET status='completed',completed_at=CURRENT_TIMESTAMP-interval '8 days',
+            result_expires_at=CURRENT_TIMESTAMP-interval '1 day',final_text='synthetic result',
+            execution_token=NULL,lease_expires_at=NULL WHERE run_id='{run}'
+    """,
+        role="worker",
+    )
+    purge = f"""
+        UPDATE runtime.model_runs SET artifacts_purged_at=CURRENT_TIMESTAMP,
+            input_text=NULL,checkpoint_text='',checkpoint_sequence=0,
+            final_text=NULL WHERE run_id='{run}'
+    """
+    assert rows.actor(purge, role="worker", check=False).returncode != 0
+    assert (
+        rows.owner(purge.replace("input_text=NULL,", ""), check=False).returncode != 0
+    )
+    rows.owner(purge)
+    assert (
+        rows.actor(
+            f"SELECT run_id,status,final_text IS NULL,input_text IS NULL FROM runtime.model_runs WHERE run_id='{run}'"
+        ).stdout.strip()
+        == f"{run}|completed|t|t"
+    )
+    assert (
+        rows.actor(
+            f"SELECT run_id FROM runtime.operation_ledger WHERE user_id='{rows.user}'"
+        ).stdout.strip()
+        == run
+    )
+    assert (
+        rows.owner(
+            f"UPDATE runtime.model_runs SET final_text='resurrected' WHERE run_id='{run}'",
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+def test_t07_operation_evidence_outlives_owned_source_deletion(runtime_rows):
+    rows = runtime_rows
+    run = str(uuid.uuid7())
+    rows.actor(rows.run_sql(run, "standalone"))
+    rows.actor(rows.operation_sql(run=run, kind="standalone_submit"))
+    # Privileged storage probe only. No application purge is implemented here.
+    rows.owner(f"DELETE FROM runtime.model_runs WHERE run_id='{run}'")
+    assert (
+        rows.actor(
+            f"SELECT run_id FROM runtime.operation_ledger WHERE user_id='{rows.user}'"
+        ).stdout.strip()
+        == run
+    )
+    assert (
+        rows.actor(
+            rows.operation_sql(key="invented-key", run=run, kind="standalone_submit"),
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+@pytest.mark.parametrize("kind", ("conversation_create", "branch_create"))
+def test_t07_created_resource_operation_identity_survives_archive_delete(
+    runtime_rows, kind
+):
+    rows = BranchRows(runtime_rows.database)
+    rows.seed()
+    conversation = (
+        rows.conversation
+        if kind == "conversation_create"
+        else rows.create_branch(mode="replace_message")
+    )
+    sql = f"""
+        INSERT INTO runtime.operation_ledger(user_id,operation_type,idempotency_key,
+            request_fingerprint,conversation_id,conversation_version,retained_until,tombstone_until)
+            VALUES ('{rows.user}','{kind}','synthetic-key',sha256('synthetic'::bytea),
+                '{conversation}',1,CURRENT_TIMESTAMP+interval '720 hours',CURRENT_TIMESTAMP+interval '1440 hours')
+    """
+    rows.actor(sql)
+    if kind == "conversation_create":
+        rows.owner(
+            f"DELETE FROM archive.message_revisions WHERE user_id='{rows.user}'; DELETE FROM archive.messages WHERE user_id='{rows.user}'"
+        )
+    rows.owner(
+        f"DELETE FROM archive.conversations WHERE conversation_id='{conversation}'"
+    )
+    assert (
+        rows.actor(
+            f"SELECT conversation_id FROM runtime.operation_ledger WHERE user_id='{rows.user}'"
+        ).stdout.strip()
+        == conversation
+    )
+    assert (
+        rows.actor(sql.replace("synthetic-key", "invented-key"), check=False).returncode
+        != 0
+    )
+
+
+def test_t07_memory_ingestion_serial_per_owner_cross_owner_parallel(runtime_rows):
+    rows = runtime_rows
+    rows.actor(rows.job_sql(str(uuid.uuid7())))
+    barrier = threading.Barrier(2)
+
+    def claim():
+        barrier.wait(timeout=15)
+        return rows.actor(rows.claim_sql(str(uuid.uuid4())), role="worker", check=False)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        results = [
+            future.result() for future in [pool.submit(claim), pool.submit(claim)]
+        ]
+    assert sorted(result.returncode == 0 for result in results) == [False, True]
+    assert "unique constraint" in next(
+        result.stderr for result in results if result.returncode
+    )
+    other = RuntimeRows(rows.database)
+    other.seed()
+    other.actor(other.job_sql())
+    assert other.actor(other.claim_sql(), role="worker").stdout.strip() == other.job
+
+
+def test_t07_stale_executor_token_and_terminal_race(runtime_rows):
+    rows = runtime_rows
+    rows.actor(rows.running_sql(), role="worker")
+    replacement = str(uuid.uuid4())
+    rows.actor(rows.running_sql(token=replacement, generation=2), role="worker")
+    assert (
+        rows.actor(
+            f"""
+        UPDATE runtime.model_runs SET checkpoint_text='stale',checkpoint_sequence=1
+            WHERE run_id='{rows.run}' AND status='running' AND execution_token='{rows.token}'
+                AND execution_generation=1 RETURNING run_id
+    """,
+            role="worker",
+        ).stdout.strip()
+        == ""
+    )
+    barrier = threading.Barrier(2)
+
+    def finish(status):
+        barrier.wait(timeout=15)
+        return rows.actor(
+            f"""
+            UPDATE runtime.model_runs SET status='{status}',completed_at=CURRENT_TIMESTAMP,
+                execution_token=NULL,lease_expires_at=NULL
+                WHERE run_id='{rows.run}' AND status='running'
+                    AND execution_token='{replacement}' AND execution_generation=2 RETURNING status
+        """,
+            role="worker",
+        ).stdout.strip()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        results = [
+            future.result()
+            for future in [
+                pool.submit(finish, "failed"),
+                pool.submit(finish, "cancelled"),
+            ]
+        ]
+    assert results.count("") == 1
+    assert (set(results) - {""}) <= {"failed", "cancelled"}
+
+
+def test_t07_standalone_final_utf8_limit(runtime_rows):
+    rows = runtime_rows
+    run = str(uuid.uuid7())
+    rows.actor(rows.run_sql(run, "standalone"))
+    rows.actor(rows.running_sql(run), role="worker")
+    finish = f"""
+        UPDATE runtime.model_runs SET status='completed',completed_at=CURRENT_TIMESTAMP,
+            execution_token=NULL,lease_expires_at=NULL,final_text=repeat('é',{{count}}),
+            result_expires_at=CURRENT_TIMESTAMP+interval '168 hours' WHERE run_id='{run}'
+    """
+    assert (
+        rows.actor(finish.format(count=524289), role="worker", check=False).returncode
+        != 0
+    )
+    rows.actor(finish.format(count=524288), role="worker")
+    assert (
+        rows.actor(
+            f"SELECT octet_length(convert_to(final_text,'UTF8')) FROM runtime.model_runs WHERE run_id='{run}'"
+        ).stdout.strip()
+        == "1048576"
+    )
+
+
+def test_t07_unresolved_operation_evidence_survives_cleanup_boundary(runtime_rows):
+    rows = runtime_rows
+    # Probe the future cleanup predicate; no deletion/cleanup worker is installed.
+    sql = rows.operation_sql().replace(
+        "retained_until,tombstone_until", "accepted_at,retained_until,tombstone_until"
+    )
+    sql = sql.replace(
+        "CURRENT_TIMESTAMP+interval '720 hours'",
+        "CURRENT_TIMESTAMP-interval '61 days',CURRENT_TIMESTAMP-interval '31 days'",
+    )
+    sql = sql.replace(
+        "CURRENT_TIMESTAMP+interval '1440 hours'", "CURRENT_TIMESTAMP-interval '1 day'"
+    )
+    rows.actor(sql)
+    eligible = f"SELECT count(*) FROM runtime.operation_ledger WHERE user_id='{rows.user}' AND resolved_at IS NOT NULL AND tombstone_until<CURRENT_TIMESTAMP"
+    assert rows.actor(eligible).stdout.strip() == "0"
+    rows.actor(
+        f"UPDATE runtime.operation_ledger SET status='cancelled',resolved_at=CURRENT_TIMESTAMP WHERE user_id='{rows.user}'",
+        role="worker",
+    )
+    assert rows.actor(eligible).stdout.strip() == "1"
+    assert (
+        rows.actor(
+            f"UPDATE runtime.operation_ledger SET status='accepted',resolved_at=NULL WHERE user_id='{rows.user}'",
+            role="worker",
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+def test_t07_deletion_control_metadata_requires_fence_and_verified_state_sequence(
+    runtime_rows,
+):
+    rows = runtime_rows
+    deletion = str(uuid.uuid7())
+    rows.owner(
+        f"INSERT INTO runtime.deletion_controls(deletion_id,user_id) VALUES ('{deletion}','{rows.user}')"
+    )
+    update = f"UPDATE runtime.deletion_controls SET {{assignment}} WHERE deletion_id='{deletion}'"
+    assert (
+        rows.owner(update.format(assignment="status='purging'"), check=False).returncode
+        != 0
+    )
+    assert (
+        rows.owner(update.format(assignment="status='fenced'"), check=False).returncode
+        != 0
+    )
+    rows.owner(
+        update.format(
+            assignment=f"status='fenced',fence_token='{uuid.uuid4()}',fenced_at=CURRENT_TIMESTAMP,journal_reference='synthetic-journal-reference'"
+        )
+    )
+    assert (
+        rows.owner(
+            update.format(assignment=f"fence_token='{uuid.uuid4()}'"), check=False
+        ).returncode
+        != 0
+    )
+    rows.owner(update.format(assignment="status='purging'"))
+    rows.owner(update.format(assignment="status='verification_required'"))
+    rows.owner(
+        update.format(assignment="status='complete',completed_at=CURRENT_TIMESTAMP")
+    )
+    assert (
+        rows.owner(
+            update.format(assignment="status='purging',completed_at=NULL"), check=False
+        ).returncode
+        != 0
+    )
