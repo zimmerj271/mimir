@@ -1,5 +1,52 @@
 # Flyway SQL migrations
 
+## V006 restricted authentication operations (T08)
+
+The owner explicitly authorized V006 during the T08 assignment. It adds five
+fixed, schema-qualified SECURITY DEFINER routines owned by `mimir_owner`, with
+`search_path=pg_catalog,pg_temp`, `row_security=on` and no PUBLIC execution:
+
+| Routine | Sole runtime caller | Behavior |
+|---|---|---|
+| `auth.provision_user(uuid,uuid,text,text,text)` | `mimir_maintenance` | Atomic account/identity creation from an administrator-supplied Argon2id verifier |
+| `auth.disable_account(uuid)` | `mimir_maintenance` | Disable account and revoke every unrevoked session atomically; false for absent account |
+| `auth.issue_session(uuid,text,bytea,text)` | `mimir_auth` | Recheck validated identity verifier/account state; create a hash-only 30d-idle/90d-absolute session |
+| `auth.renew_session(bytea)` | `mimir_auth` | Revalidate state after locks, extend monotonically without bearer rotation; no rows for rejected state |
+| `auth.revoke_session(bytea)` | `mimir_auth` | Idempotent revocation; false for an absent token hash |
+
+The authentication role is trusted backend code: it checks Argon2id before
+calling issuance with the verifier actually checked. Database routines never
+receive plaintext passwords or bearers. Each mutation locks account before
+session, temporarily sets tenant context from its restricted input/resolved
+identity, and restores the caller's prior setting. Errors roll back transactional
+context and writes. Administrator-selected target owners are confined to the
+maintenance-only routines; session routines derive owners from identity/hash
+lookups. FORCE RLS, existing policies and direct-DML denials remain intact.
+Issuance/renewal force UTC interval arithmetic independently of caller timezone.
+
+V001–V005 are unchanged. Fresh installs apply V001–V006; existing V005 installs
+apply only V006. Back up under the approved offline operator procedure and stop
+application activity before an upgrade. Run the existing reviewed migration
+command as `mimir_migrator`, then Flyway validate. Never connect application code
+as owner/migrator or patch grants outside Flyway. No production DDL is generated
+by SQLAlchemy.
+
+Failure before V006 commits rolls back its functions/grants/history entry; the
+V005 schema/data remain intact. On that failure, keep service stopped, inspect
+redacted diagnostics, correct only the unapplied candidate after review, validate
+V001–V005, then explicitly rerun migrate/validate. After successful application,
+V006 is forward-only: do not edit/undo/drop its functions, repair checksums or
+delete data/volumes. Keep service stopped and use a separately reviewed forward
+fix if necessary; application rollback alone does not reverse session revocations
+or account disablement. The tests inject a failure and checksum drift only into
+unapplied/copied migrations in disposable labelled test databases.
+
+The `test_t08_*` cases in `../../tests/integration/test_database.py` exercise the
+real production services, role grants/RLS, context restoration, races, migration
+recovery and retained pre-upgrade data. Actual commands, results, dependency
+versions and exact submitted SHA are recorded in the task PR; this description
+does not establish HTTP, restore or whole-application acceptance.
+
 T03 implements `V001__roles_and_schemas.sql`. T04 implements
 `V002__users_identities_and_sessions.sql`. T05 adds
 `V003__projects_conversations_and_messages.sql`. T06 adds
