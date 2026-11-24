@@ -1,10 +1,10 @@
 # S01 — Shared Contract Foundation: Proposed Detailed Implementation Plan
 
-**Status:** Proposed implementation specification for human review (not an approved change to the repository)  
-**Task:** S01 · shared foundation  
-**Prerequisite:** S00 merged  
-**Suggested branch:** `feature/s01-shared-contract-foundation` (from latest `main`)  
-**Primary acceptance requirement:** `GOV-02`  
+**Status:** human reviewed and approved
+**Task:** S01 · shared foundation
+**Prerequisite:** S00 merged
+**Suggested branch:** `feature/s01-shared-contract-foundation` (from latest `main`)
+**Primary acceptance requirement:** `GOV-02`
 **Downstream consumers:** T09 and later public backend HTTP tasks; CLI-03 and later Go client tasks
 
 ## 1. Objective
