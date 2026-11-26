@@ -1067,7 +1067,7 @@
         "tests/contracts/test_contracts.py",
         "tests/contracts/test_remediation.py"
       ],
-      "evidence": "docs/verification/S01_REMEDIATION.md; new R1\u2013R3 contract-only scenarios/mutations and locked validation. Runtime conformance, renewed independent review and candidate approval remain pending."
+      "evidence": "docs/verification/S01_SECOND_REMEDIATION.md; new R4 lifecycle regression/audit and R5 dependency-prose correction; R1\u2013R3 preserved. Runtime conformance, renewed review, human approval and external owner dispositions remain pending."
     }
   }
 }

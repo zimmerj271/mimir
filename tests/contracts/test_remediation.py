@@ -1,4 +1,4 @@
-"""S01 R1–R3 regressions; contract agreement only, no runtime implementation."""
+"""S01 R1–R4 regressions; contract agreement only, no runtime implementation."""
 
 from __future__ import annotations
 
@@ -410,3 +410,114 @@ class RemediationTests(unittest.TestCase):
                 checker.check_manifest()  # prove failure is not hash integrity
                 with self.assertRaisesRegex(ContractError, reason):
                     checker.check()
+
+    def test_r4_run_lifecycle_chronological_invariant(self) -> None:
+        base = next(case for case in self.cases if case["name"] == "exclude-completed")[
+            "snapshot"
+        ]["runs"][0]["body"]
+        for name, created, completed, valid in (
+            ("nonterminal-null", "2026-11-20T00:00:00Z", None, True),
+            ("after", "2026-11-20T00:00:00Z", "2026-11-20T00:00:01Z", True),
+            ("equal", "2026-11-20T00:00:00Z", "2026-11-20T00:00:00Z", True),
+            (
+                "original-impossible",
+                "2026-11-24T00:00:00Z",
+                "2026-11-20T00:00:01Z",
+                False,
+            ),
+            (
+                "fraction-before",
+                "2026-11-20T00:00:00.500000002Z",
+                "2026-11-20T00:00:00.500000001Z",
+                False,
+            ),
+            (
+                "fraction-after",
+                "2026-11-20T00:00:00.500000001Z",
+                "2026-11-20T00:00:00.500000002Z",
+                True,
+            ),
+            (
+                "equivalent-precision",
+                "2026-11-20T00:00:00.5000Z",
+                "2026-11-20T00:00:00.5Z",
+                True,
+            ),
+            (
+                "equivalent-offset",
+                "2026-11-20T00:00:00.500Z",
+                "2026-11-20T00:00:00.5+00:00",
+                True,
+            ),
+        ):
+            with self.subTest(case=name):
+                run = {**base, "created_at": created, "completed_at": completed}
+                if completed is None:
+                    run.update(status="running", final_text=None)
+                if valid:
+                    self.checker.validate(run, "#/components/schemas/Run")
+                else:
+                    with self.assertRaisesRegex(
+                        ContractError, "Run completed_at precedes created_at"
+                    ):
+                        self.checker.validate(run, "#/components/schemas/Run")
+
+    def test_r4_response_and_examples_share_semantic_assertion(self) -> None:
+        run = copy.deepcopy(
+            next(case for case in self.cases if case["name"] == "exclude-completed")[
+                "snapshot"
+            ]["runs"][0]["body"]
+        )
+        run["created_at"] = "2026-11-24T00:00:00Z"
+        with self.assertRaisesRegex(
+            ContractError, "Run completed_at precedes created_at"
+        ):
+            self.checker.validate(
+                run,
+                "#/paths/~1api~1v1~1runs~1{run_id}/get/responses/200/content/application~1json/schema",
+            )
+        # An open error-details object is not a canonical Run payload.
+        error = read_json(ROOT / "contracts/fixtures/error.json")
+        error["error"]["details"] = run
+        self.checker.validate(error, "#/components/schemas/Error")
+        for location in ("schema", "media"):
+            with self.subTest(location=location):
+                self.checker.load()
+                if location == "schema":
+                    self.checker.api["components"]["schemas"]["Run"]["examples"] = [run]
+                else:
+                    self.checker.api["paths"]["/api/v1/runs/{run_id}"]["get"][
+                        "responses"
+                    ]["200"]["content"]["application/json"]["example"] = run
+                with self.assertRaisesRegex(
+                    ContractError, "Run completed_at precedes created_at"
+                ):
+                    self.checker.check_examples()
+
+    def test_r4_impossible_fixture_rejected_after_checksum_refresh(self) -> None:
+        import shutil
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "contracts"
+            shutil.copytree(ROOT / "contracts", directory)
+            path = directory / "fixtures/discovery-cases.json"
+            cases = read_json(path)
+            run = next(case for case in cases if case["name"] == "exclude-completed")[
+                "snapshot"
+            ]["runs"][0]["body"]
+            run["created_at"] = "2026-11-24T00:00:00Z"
+            path.write_text(json.dumps(cases, indent=2) + "\n")
+            manifest = read_json(directory / "manifest.json")
+            manifest["files"]["fixtures/discovery-cases.json"] = hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+            (directory / "manifest.json").write_text(
+                json.dumps(manifest, indent=2) + "\n"
+            )
+            checker = ContractChecker(directory)
+            checker.load()
+            checker.check_manifest()
+            with self.assertRaisesRegex(
+                ContractError, "Run completed_at precedes created_at"
+            ):
+                checker.check()

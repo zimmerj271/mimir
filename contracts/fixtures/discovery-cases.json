@@ -27,7 +27,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -61,7 +61,7 @@
       "checkpoint_sequence": 0,
       "final_text": null,
       "error_code": null,
-      "created_at": "2026-11-24T00:00:00Z",
+      "created_at": "2026-11-20T00:00:00Z",
       "completed_at": null,
       "cancellation_requested": false
     },
@@ -102,7 +102,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -136,7 +136,7 @@
       "checkpoint_sequence": 0,
       "final_text": null,
       "error_code": null,
-      "created_at": "2026-11-24T00:00:00Z",
+      "created_at": "2026-11-20T00:00:00Z",
       "completed_at": null,
       "cancellation_requested": false
     },
@@ -177,7 +177,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": true
           },
@@ -211,7 +211,7 @@
       "checkpoint_sequence": 0,
       "final_text": null,
       "error_code": null,
-      "created_at": "2026-11-24T00:00:00Z",
+      "created_at": "2026-11-20T00:00:00Z",
       "completed_at": null,
       "cancellation_requested": true
     },
@@ -274,7 +274,7 @@
           "title": "Synthetic conversation",
           "conversation_version": 1,
           "status": "active",
-          "updated_at": "2026-11-20T00:00:00.5Z"
+          "updated_at": "2026-11-20T00:00:01Z"
         },
         "exists": true,
         "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
@@ -291,7 +291,7 @@
             "checkpoint_sequence": 0,
             "final_text": "Synthetic result",
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": "2026-11-20T00:00:01Z",
             "cancellation_requested": false
           },
@@ -309,7 +309,7 @@
       "title": "Synthetic conversation",
       "conversation_version": 1,
       "status": "active",
-      "updated_at": "2026-11-20T00:00:00.5Z",
+      "updated_at": "2026-11-20T00:00:01Z",
       "active_run_id": null
     },
     "expected_requests": [
@@ -332,7 +332,7 @@
           "title": "Synthetic conversation",
           "conversation_version": 1,
           "status": "active",
-          "updated_at": "2026-11-20T00:00:00.5Z"
+          "updated_at": "2026-11-20T00:00:01Z"
         },
         "exists": true,
         "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
@@ -349,7 +349,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": "2026-11-20T00:00:01Z",
             "cancellation_requested": false
           },
@@ -367,7 +367,7 @@
       "title": "Synthetic conversation",
       "conversation_version": 1,
       "status": "active",
-      "updated_at": "2026-11-20T00:00:00.5Z",
+      "updated_at": "2026-11-20T00:00:01Z",
       "active_run_id": null
     },
     "expected_requests": [
@@ -390,7 +390,7 @@
           "title": "Synthetic conversation",
           "conversation_version": 1,
           "status": "active",
-          "updated_at": "2026-11-20T00:00:00.5Z"
+          "updated_at": "2026-11-20T00:00:01Z"
         },
         "exists": true,
         "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
@@ -407,7 +407,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": "2026-11-20T00:00:01Z",
             "cancellation_requested": false
           },
@@ -425,7 +425,7 @@
       "title": "Synthetic conversation",
       "conversation_version": 1,
       "status": "active",
-      "updated_at": "2026-11-20T00:00:00.5Z",
+      "updated_at": "2026-11-20T00:00:01Z",
       "active_run_id": null
     },
     "expected_requests": [
@@ -448,7 +448,7 @@
           "title": "Synthetic conversation",
           "conversation_version": 1,
           "status": "active",
-          "updated_at": "2026-11-20T00:00:00.5Z"
+          "updated_at": "2026-11-20T00:00:01Z"
         },
         "exists": true,
         "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
@@ -465,7 +465,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": "2026-11-20T00:00:01Z",
             "cancellation_requested": false
           },
@@ -483,7 +483,7 @@
       "title": "Synthetic conversation",
       "conversation_version": 1,
       "status": "active",
-      "updated_at": "2026-11-20T00:00:00.5Z",
+      "updated_at": "2026-11-20T00:00:01Z",
       "active_run_id": null
     },
     "expected_requests": [
@@ -523,7 +523,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -581,7 +581,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -639,7 +639,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -697,7 +697,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -755,7 +755,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -813,7 +813,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -865,7 +865,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -917,7 +917,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -969,7 +969,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -1021,7 +1021,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -1074,7 +1074,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -1108,7 +1108,7 @@
       "checkpoint_sequence": 0,
       "final_text": "Synthetic result",
       "error_code": null,
-      "created_at": "2026-11-24T00:00:00Z",
+      "created_at": "2026-11-20T00:00:00Z",
       "completed_at": "2026-11-20T00:00:01Z",
       "cancellation_requested": false
     },
@@ -1125,7 +1125,7 @@
             "format": "text/v1",
             "text": "Synthetic result"
           },
-          "created_at": "2026-11-24T00:00:00Z"
+          "created_at": "2026-11-20T00:00:01Z"
         }
       ],
       "next_cursor": null
@@ -1159,7 +1159,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -1195,7 +1195,7 @@
       "checkpoint_sequence": 0,
       "final_text": null,
       "error_code": null,
-      "created_at": "2026-11-24T00:00:00Z",
+      "created_at": "2026-11-20T00:00:00Z",
       "completed_at": null,
       "cancellation_requested": false
     },
@@ -1220,7 +1220,7 @@
             "format": "text/v1",
             "text": "Synthetic result"
           },
-          "created_at": "2026-11-24T00:00:00Z"
+          "created_at": "2026-11-20T00:00:01Z"
         }
       ],
       "next_cursor": null
@@ -1233,7 +1233,7 @@
       "checkpoint_sequence": 0,
       "final_text": "Synthetic result",
       "error_code": null,
-      "created_at": "2026-11-24T00:00:00Z",
+      "created_at": "2026-11-20T00:00:00Z",
       "completed_at": "2026-11-20T00:00:01Z",
       "cancellation_requested": false
     }
@@ -1266,7 +1266,7 @@
             "checkpoint_sequence": 0,
             "final_text": null,
             "error_code": null,
-            "created_at": "2026-11-24T00:00:00Z",
+            "created_at": "2026-11-20T00:00:00Z",
             "completed_at": null,
             "cancellation_requested": false
           },
@@ -1302,7 +1302,7 @@
       "checkpoint_sequence": 0,
       "final_text": null,
       "error_code": null,
-      "created_at": "2026-11-24T00:00:00Z",
+      "created_at": "2026-11-20T00:00:00Z",
       "completed_at": null,
       "cancellation_requested": false
     },

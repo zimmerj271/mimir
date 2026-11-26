@@ -50,8 +50,11 @@ was exactly `{'$ref': '#/components/schemas/Conversation'}`.
 
 T10 owns the owner-scoped snapshot/domain/repository lookup boundary; T11 owns its
 runtime projection and HTTP response. Existing V005/partial uniqueness is reused.
-T07 is already merged, and T11 has T07 as a transitive predecessor through T09/T08;
-no task graph policy change was needed. T20/T28 own actual schema/protocol
+R5 correction: T07 is already merged into canonical main and its V005 runtime
+schema is available to T10/T11. T07 is not an ancestor of T11 in the current
+canonical task dependency graph. The earlier transitive-predecessor claim was
+inaccurate; merged availability does not establish a dependency. No task graph
+or dependency policy was changed. T20/T28 own actual schema/protocol
 conformance. CLI-03 typed consumption, CLI-10 selection, CLI-11 history, CLI-14
 streaming and CLI-15 startup/resume/recovery obligations are now explicit in their
 briefs and architectures. No downstream task implementation was started.

@@ -133,6 +133,11 @@ new pagination persistence. History retains stable older boundaries under append
 subject to current authorization/deletion. Runtime SQL/timestamp/cursor integrity
 and CLI scrolling conformance remain later-task checks.
 
+Canonical Run lifecycle timestamps retain the existing V005 invariant: a non-null
+completed_at must be at or after created_at as a chronological instant. Contract
+validation uses the same exact timestamp normalization as chronological keysets;
+formats, precision, status and nullability requirements remain unchanged.
+
 ## S01-DISCOVERY — Owner-approved conversation active-run discovery (R1)
 
 `GET /api/v1/conversations/{id}` returns `ConversationDetail`: all Conversation
@@ -174,8 +179,9 @@ run as recovery. Existing GET/SSE visibility and typed failure rules still apply
 
 T10 owns the owner-scoped domain/repository snapshot boundary and derived lookup;
 T11 integrates the runtime lookup and ConversationDetail HTTP response, preserving
-summary responses. T07's V005 is already merged; T11 also depends on T07 transitively
-through T09/T08 in the existing task graph. T20/T28 verify actual generated backend
+summary responses. T07 is already merged into canonical main, so its V005 runtime schema is
+available to T10/T11. T07 is not an ancestor of T11 in the current canonical task
+dependency graph; merged availability is distinct from a declared dependency. T20/T28 verify actual generated backend
 schema and client protocol conformance. CLI-03 owns typed detail/null consumption;
 CLI-10 latest-active/selector discovery, CLI-11 canonical history reconciliation,
 CLI-14 snapshot/terminal reattachment and CLI-15 startup/resume/recovery races own

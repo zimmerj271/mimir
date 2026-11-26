@@ -42,6 +42,6 @@ At completion, **STOP**. Open one task-scoped PR using the root `PR_REVIEW_TEMPL
 
 ## Owner-approved S01-DISCOVERY obligation
 
-Expose GET conversation as strict ConversationDetail, with required nullable UUID active_run_id from the T10 snapshot/lookup boundary. Keep list/create/patch/branch Conversation summaries unchanged. Inaccessible/nonexistent/fenced/foreign conversations return typed 404 without run disclosure; null is not an authorization/dependency fallback. Test real HTTP plus PostgreSQL/RLS/fence/snapshot behavior and completion races. T07/V005 is a transitive prerequisite via T09/T08; no new graph edge or migration is required.
+Expose GET conversation as strict ConversationDetail, with required nullable UUID active_run_id from the T10 snapshot/lookup boundary. Keep list/create/patch/branch Conversation summaries unchanged. Inaccessible/nonexistent/fenced/foreign conversations return typed 404 without run disclosure; null is not an authorization/dependency fallback. Test real HTTP plus PostgreSQL/RLS/fence/snapshot behavior and completion races. T07 is already merged into canonical main and V005 is available to T10/T11. T07 is not an ancestor of T11 in the current canonical task dependency graph; availability does not establish a graph dependency. This correction does not modify the graph or add a migration.
 
 See the single canonical [S01-DISCOVERY decision](../../contracts/HTTP_SEMANTICS.md). This adds downstream acceptance obligations only; no runtime implementation or test success is claimed by S01.

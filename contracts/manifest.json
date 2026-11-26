@@ -4,7 +4,7 @@
   "contract_version": "1.0.0",
   "hash_algorithm": "sha256",
   "files": {
-    "HTTP_SEMANTICS.md": "35807ca4c75e06e0baa24da5f933d9a263f382b24732a4ec9d138454156b9b19",
+    "HTTP_SEMANTICS.md": "246210c0c0676633d34eeb3d35355eea522af149bbc8e173eed3e35d686c6c56",
     "README.md": "16d69125ec94fbf42a2179af478967c45e16752ed1b26921e14a7bcd435984ef",
     "SSE_PROTOCOL.md": "ab0e6597014210f0fb88d5d345bba87ceb3388a680e6d0d5f9401dbd6e68388a",
     "VERSION": "59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03",
@@ -19,7 +19,7 @@
     "fixtures/cookie-policies.json": "8a4b75d945fb6ad3a2016a8f976320356f082e74fe8c4efd68b570b6abb27f21",
     "fixtures/cursor-cases.json": "7403b84bd114dcb4823acd342f01be252c5588912072500c64780e087568dedb",
     "fixtures/deletion-accepted.json": "657bc5ef5e55f31daff8d8fcaf69e67fadd2ae90583de3e5472fe8d43804c0dd",
-    "fixtures/discovery-cases.json": "978933b42bbaa658b6fac667715e964d58c31a46b00a800f8442754bc94c2f19",
+    "fixtures/discovery-cases.json": "32755e57a0094016f9be2e01f811e4da75f79ea2921df272fc33562b830d4e9f",
     "fixtures/error.json": "af32b4c72fe955a13194b6532bcae404591f4d97ec02dd42809399f4a9a21ee8",
     "fixtures/history-cases.json": "1f6fc9a1aae803f42e739913c56a660e875502b85cdd7e28ad3d41e2e2c1283a",
     "fixtures/http-errors.json": "5e33329be19f7b976007675b5f3ae87135da0bcf8b42806ac94a603ce410e902",

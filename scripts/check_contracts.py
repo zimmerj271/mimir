@@ -274,6 +274,8 @@ class ContractChecker:
             )
         except Exception:
             raise ContractError("fixture/schema validation failed") from None
+        if reference != "sse":
+            self.check_payload_semantics(instance, self.pointer(self.api, reference))
         self.check_bytes(instance)
         for node in walk(instance):
             if isinstance(node, dict) and node.get("error_code") is not None:
@@ -281,6 +283,27 @@ class ContractChecker:
                     node["error_code"] in self.errors["codes"],
                     "unknown typed error code",
                 )
+
+    def check_payload_semantics(self, instance: Any, schema: Any) -> None:
+        # Apply cross-field rules to the actual canonical type, including HTTP
+        # response references and examples. Open Error.details is not a Run just
+        # because it happens to contain similarly named fields.
+        if schema is self.api["components"]["schemas"]["Run"] or (
+            isinstance(schema, dict)
+            and schema.get("$ref") == "#/components/schemas/Run"
+        ):
+            self.check_run_lifecycle(instance)
+
+    @staticmethod
+    def check_run_lifecycle(run: dict[str, Any]) -> None:
+        from contract_protocols import chronological_key
+
+        if run["completed_at"] is not None:
+            require(
+                chronological_key(run["completed_at"], run["run_id"])[0]
+                >= chronological_key(run["created_at"], run["run_id"])[0],
+                "Run completed_at precedes created_at",
+            )
 
     @staticmethod
     def check_bytes(value: Any) -> None:
@@ -698,6 +721,7 @@ class ContractChecker:
                         raise ContractError(
                             "invalid documented media example"
                         ) from None
+                    self.check_payload_semantics(value, node["schema"])
             if "type" in node or "$ref" in node:
                 values = node.get("examples", [])
                 if isinstance(values, list):
@@ -711,6 +735,7 @@ class ContractChecker:
                             raise ContractError(
                                 "invalid documented schema example"
                             ) from None
+                        self.check_payload_semantics(value, node)
 
     def check(self) -> None:
         self.load()
