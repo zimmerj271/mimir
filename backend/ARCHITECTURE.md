@@ -81,6 +81,14 @@ authorized contract governance; T05 does not alter protected contract artifacts.
 - Optimistic conversation version checks, explicit `Idempotency-Key` on create/submit/branch/regenerate operations, tenant-scoped error responses, opaque cursor pagination, ownership checks for all GET/SSE/POST operations.
 - In-process event bus is replaceable and supports multiple subscribers, but does not own durable state. REST remains authoritative for run state, even after event loss.
 
+The owner-approved S01-AUTH/S01-CANCEL/S01-PAGE rules in
+[HTTP semantics](../contracts/HTTP_SEMANTICS.md) bind credential transport, browser
+HTTPS/CSRF/origin/host controls, cancellation status/body snapshots, and deterministic
+keyset ordering. Canonical archive mutations alone advance conversation updated_at;
+reads/provisional/runtime-only activity do not. Latest active uses existing listing
+pages, and V004 visible ordinals support stable older-history traversal under append.
+No runtime implementation or database migration is part of S01.
+
 ## 8. Runtime
 - Durable `runtime.jobs` queue with PostgreSQL `FOR UPDATE SKIP LOCKED`, leases, lease tokens and bounded retry scheduling; run executor separate from generic background jobs. Only short DB transactions; no DB transactions around inference or Mem0 calls.
 - Known transient failure retries with capped exponential backoff/jitter; permanent failure terminal; ambiguous Mem0 ingestion outcome enters explicit reconciliation state or manual intervention. Lost worker lease cannot authorize stale completion; acknowledge that provider side effects may already have happened.

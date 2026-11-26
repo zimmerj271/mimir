@@ -1,0 +1,290 @@
+[
+  {
+    "name": "conversation-pending",
+    "http_status": 202,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "pending",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": true
+    }
+  },
+  {
+    "name": "conversation-running",
+    "http_status": 202,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "running",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": true
+    }
+  },
+  {
+    "name": "conversation-completed",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "completed",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": "Hello",
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "conversation-failed",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "failed",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": "dependency_unavailable",
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "conversation-cancelled",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "cancelled",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "conversation-interrupted",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "interrupted",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "conversation-repeat-request",
+    "http_status": 202,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "running",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": true
+    }
+  },
+  {
+    "name": "conversation-immediate-cancellation",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "cancelled",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "conversation-completion-wins",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "completed",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": "Hello",
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "standalone-pending",
+    "http_status": 202,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "standalone",
+      "status": "pending",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": true
+    }
+  },
+  {
+    "name": "standalone-running",
+    "http_status": 202,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "standalone",
+      "status": "running",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": true
+    }
+  },
+  {
+    "name": "standalone-completed",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "standalone",
+      "status": "completed",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": "Hello",
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "standalone-failed",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "standalone",
+      "status": "failed",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": "dependency_unavailable",
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "standalone-cancelled",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "standalone",
+      "status": "cancelled",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "standalone-interrupted",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "standalone",
+      "status": "interrupted",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "standalone-repeat-request",
+    "http_status": 202,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "standalone",
+      "status": "running",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": true
+    }
+  },
+  {
+    "name": "standalone-immediate-cancellation",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "standalone",
+      "status": "cancelled",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "standalone-completion-wins",
+    "http_status": 200,
+    "run": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "standalone",
+      "status": "completed",
+      "checkpoint_text": "Hello",
+      "checkpoint_sequence": 1,
+      "final_text": "Hello",
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-24T00:00:01Z",
+      "cancellation_requested": false
+    }
+  }
+]

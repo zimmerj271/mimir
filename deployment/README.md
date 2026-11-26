@@ -9,7 +9,7 @@ Acceptance: DEPLOY-01. This is not the later connected installer/release gate.
 
 `compose.yaml` defines PostgreSQL 18.4, Qdrant 1.19.2, Ollama 0.40.6, external
 persistent volumes and an externally isolated private network. Service images,
-Python 3.14.7 and uv 0.12.10 build stages are pinned by verified registry digests.
+Python 3.14.7 and uv 0.13.9 build stages are pinned by verified registry digests.
 The backend image installs only the locked runtime package; Compose runs it as
 65532:65532, drops capabilities and makes its filesystem read-only. Build context
 is allowlisted, excluding host environments, secrets and caches.
@@ -40,7 +40,7 @@ credentials do not implement Mimir user/session authentication.
 ## First foundation startup
 
 Requires Docker Engine access, Compose **5.5.1** (tested and pinned in CI), uv
-0.12.10 and Python 3.14.7. Commands below run from the monorepo root. Setup
+>=0.13.4,<0.14.0 and Python 3.14.7. Commands below run from the monorepo root. Setup
 explicitly downloads pinned service/build images and locked tooling, not models.
 The data/model private network has no external egress. The backend's separate API
 bridge is a standard Docker bridge; it does not provide an egress firewall for
@@ -145,7 +145,7 @@ static tests do not establish live-service acceptance.
 
 Digests were resolved using `docker buildx imagetools inspect` against official
 `postgres:18.4`, `qdrant/qdrant:v1.19.2`, `ollama/ollama:0.40.6`,
-`python:3.14.7-slim-bookworm`, `ghcr.io/astral-sh/uv:0.12.10` manifests.
+`python:3.14.7-slim-bookworm`, `ghcr.io/astral-sh/uv:0.13.9` manifests.
 Relevant upstream references:
 [Postgres 18 image data layout](https://hub.docker.com/_/postgres),
 [private networks](https://docs.docker.com/reference/compose-file/networks/),
@@ -155,3 +155,12 @@ Relevant upstream references:
 Rollback is a separately authorized reviewed revert; it removes neither stored
 data nor credentials. No applied migrations exist in this task. Stop after opening
 the PR: agent review, human review and explicit merge authorization remain pending.
+
+
+S01's owner-authorized uv CLI upgrade pins the 0.13.9 multi-platform image to
+`sha256:d3b601f0c7b118bc1753febf7c41cc80981df678445e0254284eecf84db79a7d`.
+The digest/version and linux/amd64 + linux/arm64 entries were verified against
+[Astral's published GHCR package metadata](https://github.com/astral-sh/uv/pkgs/container/uv/versions?filters%5Bversion_type%5D=tagged).
+Direct registry retrieval/build verification is recorded separately in
+[S01 evidence](../docs/verification/S01.md); publisher metadata verification does
+not claim an executed container build. Python image/version/digest are unchanged.

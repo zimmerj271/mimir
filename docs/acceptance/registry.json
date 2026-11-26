@@ -1002,6 +1002,71 @@
       "tests": [
         "tests/integration/test_database.py"
       ]
+    },
+    "S01": {
+      "specification": "docs/governance/tasks/S01_shared-contract-foundation.md",
+      "requirements": [
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "GOV-02"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "API-SESSION-01"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "SSE-01"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "LIFECYCLE-02"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "CLI-REC-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "API-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "SEC-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "CONTRACT-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "OP-LOOKUP-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "OP-LOOKUP-02"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "INF-02"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "SSE-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "SSE-02"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "SSE-STAND-01"
+        }
+      ],
+      "tests": [
+        "tests/contracts/test_contracts.py"
+      ],
+      "evidence": "docs/verification/S01.md; agent locked contract/toolchain checks passed; human full backend-check passed (105 tests), verified against unchanged fingerprinted inputs. Runtime producer/consumer conformance and candidate approval pending."
     }
   }
 }

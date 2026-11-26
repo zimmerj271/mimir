@@ -61,7 +61,7 @@ and receives none of these secrets in T03.
 
 ## Explicit operator commands
 
-Prerequisites: Docker daemon access, Compose 5.5.1, uv 0.12.10, Python 3.14.7,
+Prerequisites: Docker daemon access, Compose 5.5.1, local uv >=0.13.4,<0.14.0 (CI/container: 0.13.9), Python 3.14.7,
 and T02's existing protected bootstrap/Qdrant secrets and external volumes.
 Provision the five additional passwords once, from the repository root:
 

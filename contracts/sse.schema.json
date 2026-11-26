@@ -21,7 +21,9 @@
           "minimum": 0
         },
         "text": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1048576,
+          "x-max-utf8-bytes": 1048576
         },
         "status": {
           "enum": [
@@ -85,7 +87,9 @@
           "minimum": 1
         },
         "text": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1048576,
+          "x-max-utf8-bytes": 1048576
         }
       },
       "required": [
@@ -144,7 +148,9 @@
           "const": "run.completed"
         },
         "final_text": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1048576,
+          "x-max-utf8-bytes": 1048576
         }
       },
       "required": [
@@ -227,5 +233,6 @@
       "description": "Control event; does not consume contiguous message.delta text sequence."
     }
   ],
-  "$defs": {}
+  "$defs": {},
+  "x-contract-version": "1.0.0"
 }

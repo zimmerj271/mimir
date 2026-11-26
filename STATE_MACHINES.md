@@ -38,3 +38,15 @@ for memory ingestion. T05 verifies archive-local constraints only; T12/T16 own
 cross-domain atomicity. Unsuccessful checkpoint retention and explicit retry
 behavior are unresolved by this clarification. The draft shared `Message.status`
 enumeration requires separately authorized reconciliation; it is not changed here.
+
+
+**Owner-approved S01-CANCEL:** cancel responses use one authoritative snapshot:
+202 iff nonterminal with durably accepted cancellation_requested true; 200 iff
+terminal with cancellation_requested false, including immediate cancellation or
+completion winning during processing. A terminal Run is returned unchanged, never
+409 solely for being terminal. Repeated requests have no duplicate side effects
+and require no separate idempotency key. Before worker claim cancellation wins
+atomically; running races use the first valid terminal commit, and late provider
+output cannot overwrite it. Do not wait for provider cancellation. Both run kinds
+agree; GET resolves later state and SSE reports committed outcomes. Runtime
+concurrency/fencing is not established by S01 contract fixtures.

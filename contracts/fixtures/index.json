@@ -1,0 +1,140 @@
+{
+  "fixtures": [
+    {
+      "path": "auth-cases.json",
+      "kind": "auth"
+    },
+    {
+      "path": "branch-after.json",
+      "schema": "#/components/schemas/BranchCreate"
+    },
+    {
+      "path": "branch-replace.json",
+      "schema": "#/components/schemas/BranchCreate"
+    },
+    {
+      "path": "cancellation.json",
+      "kind": "cancellation"
+    },
+    {
+      "path": "canonical-message.json",
+      "schema": "#/components/schemas/Message"
+    },
+    {
+      "path": "conversation-create.json",
+      "schema": "#/components/schemas/ConversationCreate"
+    },
+    {
+      "path": "conversation-patch.json",
+      "schema": "#/components/schemas/ConversationPatch"
+    },
+    {
+      "path": "cookie-policies.json",
+      "kind": "cookie_policy"
+    },
+    {
+      "path": "cursor-cases.json",
+      "kind": "cursor"
+    },
+    {
+      "path": "deletion-accepted.json",
+      "schema": "#/components/schemas/DeletionAccepted"
+    },
+    {
+      "path": "error.json",
+      "schema": "#/components/schemas/Error"
+    },
+    {
+      "path": "history-cases.json",
+      "kind": "history"
+    },
+    {
+      "path": "http-errors.json",
+      "kind": "errors"
+    },
+    {
+      "path": "listing-cases.json",
+      "kind": "listing"
+    },
+    {
+      "path": "login-web.json",
+      "schema": "#/components/schemas/WebLoginResponse"
+    },
+    {
+      "path": "message-content.json",
+      "schema": "#/components/schemas/MessageContent"
+    },
+    {
+      "path": "message-submit.json",
+      "schema": "#/components/schemas/MessageSubmit"
+    },
+    {
+      "path": "operation-known.json",
+      "schema": "#/components/schemas/Operation"
+    },
+    {
+      "path": "project-create.json",
+      "schema": "#/components/schemas/ProjectCreate"
+    },
+    {
+      "path": "project-patch.json",
+      "schema": "#/components/schemas/ProjectPatch"
+    },
+    {
+      "path": "run-visibility.json",
+      "kind": "visibility"
+    },
+    {
+      "path": "session-cli.json",
+      "schema": "#/components/schemas/Session"
+    },
+    {
+      "path": "session-web.json",
+      "schema": "#/components/schemas/Session"
+    },
+    {
+      "path": "sse-cancelled.json",
+      "schema": "sse"
+    },
+    {
+      "path": "sse-completed.json",
+      "schema": "sse"
+    },
+    {
+      "path": "sse-delta.json",
+      "schema": "sse"
+    },
+    {
+      "path": "sse-failed.json",
+      "schema": "sse"
+    },
+    {
+      "path": "sse-interrupted.json",
+      "schema": "sse"
+    },
+    {
+      "path": "sse-snapshot.json",
+      "schema": "sse"
+    },
+    {
+      "path": "sse-started.json",
+      "schema": "sse"
+    },
+    {
+      "path": "sse-transcripts.json",
+      "kind": "sse_transcript"
+    },
+    {
+      "path": "sse-usage.json",
+      "schema": "sse"
+    },
+    {
+      "path": "standalone-submit.json",
+      "schema": "#/components/schemas/StandaloneSubmit"
+    },
+    {
+      "path": "user-patch.json",
+      "schema": "#/components/schemas/UserPatch"
+    }
+  ]
+}

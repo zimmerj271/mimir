@@ -35,7 +35,7 @@
 2. Client `GET /runs/{run_id}/events` with session. Server authenticates before SSE, emits authoritative `run.snapshot` of accumulated text with high-water sequence, then `run.started`, `message.delta`, optional `run.usage`, exactly one terminal `run.completed`, `run.failed`, `run.cancelled`, `run.interrupted` as applicable. Snapshot/subscribe must have atomic handoff. Event sequences monotonic per run.
 3. Disconnect does **not** cancel a run. Reconnect gets new snapshot replacing displayed text, then live deltas higher than snapshot high-water. Never promise durable event replay or use SSE `Last-Event-ID` without actually implementing it. Bounded per-subscriber buffers; overflow terminates subscriber to force snapshot recovery.
 4. Terminal completion SSE emitted only **after** final assistant revision and terminal run state commit. Failure before SSE handshake uses HTTP JSON error; failure after open uses terminal SSE event; transport break requires `GET /runs/{id}` for authoritative state.
-5. Cancellation `POST /runs/{id}/cancel` returns `202` for requested cancellation and durable terminal status when achieved; cancellation races resolve to exactly one terminal status.
+5. Cancellation `POST /runs/{id}/cancel` returns canonical Run: `202` for a durably accepted request with nonterminal snapshot and cancellation_requested true; `200` for any terminal snapshot, unchanged, with cancellation_requested false. Status/body share a snapshot; repeated requests are idempotent without a separate key, do not wait for provider completion, and already-terminal is not a 409. Nonexistent/cross-user IDs are 404. See S01-CANCEL in `../contracts/HTTP_SEMANTICS.md`.
 
 ## Common errors
 `{ "error": { "code": "stable_code", "message": "Human-readable message", "details": {} }, "request_id": "..." }`. HTTP 400/401/403/404/409/413/422/429/503/504 as appropriate. Typed codes for `conversation_version_conflict`, `idempotency_key_conflict`, `context_budget_exceeded`, dependency degradation and run conflicts. Cursors opaque, user/filter scoped with deterministic unique-tiebreak ordering.
@@ -68,6 +68,22 @@ All paths below are relative to `/api/v1`; endpoint shapes are **normative propo
 
 ## Contract-first closure gate (supersedes draft timing)
 The endpoints above are **design inputs only**, not an approved schema. The delivered `openapi.yaml`, SSE JSON schema, error code catalog and golden fixtures must be checked/approved and then verified by tests **before** implementation of public HTTP/event shapes or CLI-03. The older language saying T20 alone freezes the contract during implementation describes a superseded sequencing intention. T20 validates/publishes conformant generated FastAPI schema against the reviewed contract; it does not decide payload semantics. Do not invent JSON schemas, idempotency encoding, SSE synthetic event sequences or retention defaults. See `../contracts/README.md` and `../SPECIFICATION_GAPS.md` G02/G06/G09.
+
+## Approved S01 wire resolutions
+
+S01-AUTH, S01-CANCEL and S01-PAGE in
+[HTTP semantics](../contracts/HTTP_SEMANTICS.md) define the exact approved rules.
+One T08 session model supports exclusive transport-bound CLI bearer and HTTPS web
+cookie authentication. Browser login JSON omits access_token; all browser mutations
+require the configured exact Origin and X-Mimir-CSRF: 1. No-store, trusted-host,
+cookie issuance/expiry, credential ambiguity and redaction rules are mandatory.
+Projects/conversations use the approved descending timestamp/UUID keysets;
+latest-active discovery traverses the existing conversation listing. Canonical
+changes alone advance updated_at. V004 history pages select newest/return ascending,
+then traverse older exclusive visible-ordinal boundaries. Cursors are opaque,
+integrity-protected and scope-bound, with 422 invalid_request for invalid cursors
+on accessible resources. Mutable listings have no cross-request frozen snapshot.
+This contract work does not implement handlers or verify runtime conformance.
 
 ## V1 resolution and review authority
 The selected v1 behavior baseline is `CONTRACT_DECISIONS_V1.md`, with lifecycle rules in `STATE_MACHINES.md`, context format in `PROMPT_AND_MEMORY_CONTRACT.md`, and wire schemas in `contracts/`. Older wording describing G01–G15 as unanswered or suggesting T20 may choose public payload shapes is superseded. Every feature PR must pass the **mandatory stop / independent-agent + human review** in `PR_REVIEW_TEMPLATE.md`; no subsequent branch work before authorized merge and reassignment.

@@ -1,0 +1,468 @@
+[
+  {
+    "name": "projects-ties",
+    "rows": [
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000001",
+        "created_at": "2026-11-20T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": true,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+        "created_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "archived",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000003",
+        "created_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": false,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000004",
+        "created_at": "2026-11-24T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": true,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000005",
+        "created_at": "2026-11-24T00:00:00Z"
+      }
+    ],
+    "fields": [
+      "created_at",
+      "project_id"
+    ],
+    "limit": 5,
+    "expected_ids": [
+      "0199a1b2-c3d4-7e8f-9123-000000000003",
+      "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "0199a1b2-c3d4-7e8f-9123-000000000001"
+    ]
+  },
+  {
+    "name": "projects-first-page",
+    "rows": [
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000001",
+        "created_at": "2026-11-20T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": true,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+        "created_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "archived",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000003",
+        "created_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": false,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000004",
+        "created_at": "2026-11-24T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": true,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000005",
+        "created_at": "2026-11-24T00:00:00Z"
+      }
+    ],
+    "fields": [
+      "created_at",
+      "project_id"
+    ],
+    "limit": 1,
+    "expected_ids": [
+      "0199a1b2-c3d4-7e8f-9123-000000000003"
+    ]
+  },
+  {
+    "name": "projects-older-page",
+    "rows": [
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000001",
+        "created_at": "2026-11-20T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": true,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+        "created_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "archived",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000003",
+        "created_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": false,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000004",
+        "created_at": "2026-11-24T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": true,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000005",
+        "created_at": "2026-11-24T00:00:00Z"
+      }
+    ],
+    "fields": [
+      "created_at",
+      "project_id"
+    ],
+    "limit": 2,
+    "expected_ids": [
+      "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "0199a1b2-c3d4-7e8f-9123-000000000001"
+    ],
+    "boundary": [
+      "2026-11-21T00:00:00Z",
+      "0199a1b2-c3d4-7e8f-9123-000000000003"
+    ]
+  },
+  {
+    "name": "projects-exhausted",
+    "rows": [
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000001",
+        "created_at": "2026-11-20T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": true,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+        "created_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "archived",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000003",
+        "created_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": false,
+        "fenced": false,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000004",
+        "created_at": "2026-11-24T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": true,
+        "nonterminal_run": false,
+        "project_id": "0199a1b2-c3d4-7e8f-9123-000000000005",
+        "created_at": "2026-11-24T00:00:00Z"
+      }
+    ],
+    "fields": [
+      "created_at",
+      "project_id"
+    ],
+    "limit": 2,
+    "expected_ids": [],
+    "boundary": [
+      "2026-11-20T00:00:00Z",
+      "0199a1b2-c3d4-7e8f-9123-000000000001"
+    ]
+  },
+  {
+    "name": "projects-empty",
+    "rows": [],
+    "fields": [
+      "created_at",
+      "project_id"
+    ],
+    "limit": 50,
+    "expected_ids": [],
+    "latest_active": null
+  },
+  {
+    "name": "conversations-ties",
+    "rows": [
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000001",
+        "updated_at": "2026-11-20T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": true,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+        "updated_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "archived",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000003",
+        "updated_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": false,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000004",
+        "updated_at": "2026-11-24T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": true,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000005",
+        "updated_at": "2026-11-24T00:00:00Z"
+      }
+    ],
+    "fields": [
+      "updated_at",
+      "conversation_id"
+    ],
+    "limit": 5,
+    "expected_ids": [
+      "0199a1b2-c3d4-7e8f-9123-000000000003",
+      "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "0199a1b2-c3d4-7e8f-9123-000000000001"
+    ],
+    "latest_active": "0199a1b2-c3d4-7e8f-9123-000000000002"
+  },
+  {
+    "name": "conversations-first-page",
+    "rows": [
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000001",
+        "updated_at": "2026-11-20T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": true,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+        "updated_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "archived",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000003",
+        "updated_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": false,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000004",
+        "updated_at": "2026-11-24T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": true,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000005",
+        "updated_at": "2026-11-24T00:00:00Z"
+      }
+    ],
+    "fields": [
+      "updated_at",
+      "conversation_id"
+    ],
+    "limit": 1,
+    "expected_ids": [
+      "0199a1b2-c3d4-7e8f-9123-000000000003"
+    ]
+  },
+  {
+    "name": "conversations-older-page",
+    "rows": [
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000001",
+        "updated_at": "2026-11-20T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": true,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+        "updated_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "archived",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000003",
+        "updated_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": false,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000004",
+        "updated_at": "2026-11-24T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": true,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000005",
+        "updated_at": "2026-11-24T00:00:00Z"
+      }
+    ],
+    "fields": [
+      "updated_at",
+      "conversation_id"
+    ],
+    "limit": 2,
+    "expected_ids": [
+      "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "0199a1b2-c3d4-7e8f-9123-000000000001"
+    ],
+    "boundary": [
+      "2026-11-21T00:00:00Z",
+      "0199a1b2-c3d4-7e8f-9123-000000000003"
+    ],
+    "latest_active": "0199a1b2-c3d4-7e8f-9123-000000000002"
+  },
+  {
+    "name": "conversations-exhausted",
+    "rows": [
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000001",
+        "updated_at": "2026-11-20T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": true,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+        "updated_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "archived",
+        "owned": true,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000003",
+        "updated_at": "2026-11-21T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": false,
+        "fenced": false,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000004",
+        "updated_at": "2026-11-24T00:00:00Z"
+      },
+      {
+        "status": "active",
+        "owned": true,
+        "fenced": true,
+        "nonterminal_run": false,
+        "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000005",
+        "updated_at": "2026-11-24T00:00:00Z"
+      }
+    ],
+    "fields": [
+      "updated_at",
+      "conversation_id"
+    ],
+    "limit": 2,
+    "expected_ids": [],
+    "boundary": [
+      "2026-11-20T00:00:00Z",
+      "0199a1b2-c3d4-7e8f-9123-000000000001"
+    ]
+  },
+  {
+    "name": "conversations-empty",
+    "rows": [],
+    "fields": [
+      "updated_at",
+      "conversation_id"
+    ],
+    "limit": 50,
+    "expected_ids": [],
+    "latest_active": null
+  }
+]
