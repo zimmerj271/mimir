@@ -41,6 +41,10 @@
       "schema": "#/components/schemas/DeletionAccepted"
     },
     {
+      "path": "discovery-cases.json",
+      "kind": "discovery"
+    },
+    {
       "path": "error.json",
       "schema": "#/components/schemas/Error"
     },

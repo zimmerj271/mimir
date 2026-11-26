@@ -4,7 +4,7 @@
   "contract_version": "1.0.0",
   "hash_algorithm": "sha256",
   "files": {
-    "HTTP_SEMANTICS.md": "dbd8a67fa79b3da9cab38143d3b7ab0cd062c07134510aa2ba0460cb888c7582",
+    "HTTP_SEMANTICS.md": "35807ca4c75e06e0baa24da5f933d9a263f382b24732a4ec9d138454156b9b19",
     "README.md": "16d69125ec94fbf42a2179af478967c45e16752ed1b26921e14a7bcd435984ef",
     "SSE_PROTOCOL.md": "ab0e6597014210f0fb88d5d345bba87ceb3388a680e6d0d5f9401dbd6e68388a",
     "VERSION": "59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03",
@@ -19,11 +19,12 @@
     "fixtures/cookie-policies.json": "8a4b75d945fb6ad3a2016a8f976320356f082e74fe8c4efd68b570b6abb27f21",
     "fixtures/cursor-cases.json": "7403b84bd114dcb4823acd342f01be252c5588912072500c64780e087568dedb",
     "fixtures/deletion-accepted.json": "657bc5ef5e55f31daff8d8fcaf69e67fadd2ae90583de3e5472fe8d43804c0dd",
+    "fixtures/discovery-cases.json": "978933b42bbaa658b6fac667715e964d58c31a46b00a800f8442754bc94c2f19",
     "fixtures/error.json": "af32b4c72fe955a13194b6532bcae404591f4d97ec02dd42809399f4a9a21ee8",
     "fixtures/history-cases.json": "1f6fc9a1aae803f42e739913c56a660e875502b85cdd7e28ad3d41e2e2c1283a",
     "fixtures/http-errors.json": "5e33329be19f7b976007675b5f3ae87135da0bcf8b42806ac94a603ce410e902",
-    "fixtures/index.json": "26dc9d77436457af9e1b2912638580ca1d936722695c2cf80be300220e749a22",
-    "fixtures/listing-cases.json": "2277694e7815dc7d636af3cb1fc405132166824b61b54546b236a476b120724f",
+    "fixtures/index.json": "ee7722bb1b38f58ebdefec108fe730909112b317edf546f39f3854858e0b0bdb",
+    "fixtures/listing-cases.json": "d148ce7efe0c51bbaafd4bc781ff51800e596aa6e798fc69a03beae1e5f54538",
     "fixtures/login-web.json": "44da46499ffe90c01ddda0e5812c21ee5ad01766c35d623d735d43bda0ec2ba4",
     "fixtures/message-content.json": "5204ccf5055eb7c780b66958c6f78d2e0af4de18754f7fbe16514ff276830061",
     "fixtures/message-submit.json": "468aac42d6cd0ae36ca262e82286f9b328081d380de1a74ffbad52a1f1aff92a",
@@ -44,7 +45,7 @@
     "fixtures/sse-usage.json": "04901b6bca0c28ebbd127d1e47bebb3b2237f3723393c6b03314a8a99194a0da",
     "fixtures/standalone-submit.json": "c08e188faf71a4c6c1444de53020eab56c3e1f2586b3b55b76aad779ee996822",
     "fixtures/user-patch.json": "36b39b82f90dd43cce3130a3a6095fe6785251dfbdffc42091b907d7f50eca7f",
-    "openapi.yaml": "2aa4d852ebe060a86e622857c4a5af2ee8ab19d58872634e878ee4a2f31c9dfb",
+    "openapi.yaml": "fa20a9a69ed3f2e17eb54ac0ac38da2c348c65c682ffcf2c2f428436dec40315",
     "sse.schema.json": "228c911c6b8777123df8b94f61b378ae4be8961e84fb31001e60bb75e2216555"
   }
 }

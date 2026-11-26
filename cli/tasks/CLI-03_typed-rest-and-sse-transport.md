@@ -68,3 +68,9 @@ Apply repository `AGENTS.md` and language `CODING_STANDARDS.md`. Before writing 
 At completion, **STOP**. Open one task-scoped PR using the root `PR_REVIEW_TEMPLATE.md`. Require successful documented checks, independent coding-agent review, explicit human review and affirmative merge approval. Do not merge autonomously or begin the next task before merge confirmation and a fresh human assignment. See `AGENTS.md` and `QUALITY_GATES.md`.
 
 **V1 normative references:** `CONTRACT_DECISIONS_V1.md`, `STATE_MACHINES.md`, `PROMPT_AND_MEMORY_CONTRACT.md`, `contracts/openapi.yaml`, `contracts/sse.schema.json`, and `contracts/errors.json` at unified-package root. These are consumed from the one shared `/contracts` directory in the monorepo; without separate copies.
+
+## Owner-approved S01-DISCOVERY obligation
+
+Consume the distinct typed ConversationDetail response and required nullable active_run_id; reject malformed/omitted fields according to the canonical contract. Construct existing run GET/SSE requests only from the discovered UUID; validate null and typed errors without inventing IDs or retrying submissions. Actual client conformance belongs here, not to S01 fixtures.
+
+See the single canonical [S01-DISCOVERY decision](../../contracts/HTTP_SEMANTICS.md). This adds downstream acceptance obligations only; no runtime implementation or test success is claimed by S01.

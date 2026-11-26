@@ -132,3 +132,72 @@ cursor to refresh. No long-lived transactions, materialized listing snapshots or
 new pagination persistence. History retains stable older boundaries under append,
 subject to current authorization/deletion. Runtime SQL/timestamp/cursor integrity
 and CLI scrolling conformance remain later-task checks.
+
+## S01-DISCOVERY — Owner-approved conversation active-run discovery (R1)
+
+`GET /api/v1/conversations/{id}` returns `ConversationDetail`: all Conversation
+summary properties plus required, nullable, read-only `active_run_id` (UUID or
+null, never omitted). List/create/patch/branch and other summary responses retain
+Conversation unchanged. No new endpoint, request field, query or sort option.
+The two closed schemas share property definitions rather than extending a closed
+Conversation with allOf. Unknown properties remain rejected.
+
+Metadata and active_run_id come from one consistent authoritative database read
+snapshot. Only an owner-authorized, visible, unfenced conversational run for that
+same conversation with status pending or running qualifies; cancellation_requested
+true remains eligible. Completed/failed/cancelled/interrupted and standalone runs
+never qualify. V005 `runtime.model_runs` and `model_runs_one_active_conversation`
+already enforce at most one nonterminal run per owner/conversation. Derive the
+reference; no persisted column, index or migration is introduced. Discovery and
+changes to this runtime reference alone never increment conversation_version or
+advance updated_at.
+
+Enforce conversation authorization, RLS and deletion fences before disclosure.
+Nonexistent, inaccessible, fenced and foreign-owner conversations return the same
+existing typed 404, without disclosing run existence. Null means an accessible
+conversation has no eligible run at that read snapshot; it never substitutes for
+an authorization failure or runtime dependency failure (retain typed failure,
+including 503 dependency_unavailable where applicable).
+
+A client with no submission metadata selects an eligible conversation from the
+existing listing (traversing archived pages) or explicitly selects its ID, GETs
+ConversationDetail, then uses only non-null active_run_id to construct existing
+GET `/api/v1/runs/{run_id}` and, when nonterminal, GET
+`/api/v1/runs/{run_id}/events`. Null proceeds to ordinary history loading. Do not
+infer run IDs from message IDs, cached operations, timestamps or undocumented
+fields. This does not replace operation/idempotency-key recovery for ambiguous
+submissions. The discovery response is a snapshot, not a continued liveness promise.
+A run may finish before status inspection or SSE attachment. Preserve snapshot-first
+SSE and terminal handling; when completion wins, recover canonical committed
+conversation history. Never fabricate cancellation, resubmit a prompt or create a
+run as recovery. Existing GET/SSE visibility and typed failure rules still apply.
+
+T10 owns the owner-scoped domain/repository snapshot boundary and derived lookup;
+T11 integrates the runtime lookup and ConversationDetail HTTP response, preserving
+summary responses. T07's V005 is already merged; T11 also depends on T07 transitively
+through T09/T08 in the existing task graph. T20/T28 verify actual generated backend
+schema and client protocol conformance. CLI-03 owns typed detail/null consumption;
+CLI-10 latest-active/selector discovery, CLI-11 canonical history reconciliation,
+CLI-14 snapshot/terminal reattachment and CLI-15 startup/resume/recovery races own
+actual client behavior. These are obligations, not implemented S01 runtime claims.
+
+### R2/R3 agreement clarifications (unchanged S01-PAGE/S01-AUTH behavior)
+
+Chronological keysets compare timestamp instants, with equivalent RFC3339
+fractional representations equal and all supplied fractional precision retained;
+UUID tie-breakers compare identities. Sorting and exclusive cursor comparisons
+use the same normalization. No fixed timestamp spelling or precision is required.
+Removed boundary records and mutable-listing limitations above remain unchanged.
+
+OpenAPI parameter `x-mimir-browser-requirement` and header `x-mimir-cookie`
+metadata make the existing conditional requirements machine-checkable. They agree
+with the normative descriptions and fixture policies: browser mutations require
+CSRF value 1 and exact trusted Origin, authenticated GET needs no CSRF and rejects
+unauthorized Origin if supplied; CLI bearer does not acquire browser-only duties.
+Login 201 Set-Cookie references SessionCookie, logout 204 references
+ExpiredSessionCookie; each is required for web and absent for CLI. Logout expires
+with Max-Age=0; issuance has positive Max-Age bounded by remaining absolute lifetime.
+Both retain HTTPS/HttpOnly/Secure/SameSite=Strict/Path=/ and no Domain. Applicable
+authentication success responses reference required NoStore via Cache-Control.
+The executable checks inspect wiring, resolved definitions, structured agreement
+policies and complete normative descriptions, independently of manifest integrity.

@@ -33,6 +33,7 @@ from contract_protocols import (  # noqa: E402
     history_page,
     ordered_page,
 )
+from test_remediation import mutate_auth, write_api  # noqa: E402
 
 
 class ContractTests(unittest.TestCase):
@@ -561,18 +562,6 @@ class ContractTests(unittest.TestCase):
                     ),
                 )
 
-    def test_latest_active_traverses_archived_page_and_allows_running(self) -> None:
-        case = read_json(ROOT / "contracts/fixtures/listing-cases.json")[5]
-        fields = ("updated_at", "conversation_id")
-        rows = case["rows"]
-        page = ordered_page(rows, fields, 1)
-        self.assertEqual(page[0]["status"], "archived")
-        page = ordered_page(rows, fields, 1, [page[0][f] for f in fields])
-        self.assertEqual(page[0]["status"], "active")
-        self.assertTrue(page[0]["nonterminal_run"])
-        self.assertTrue(page[0]["owned"])
-        self.assertFalse(page[0]["fenced"])
-
     def test_history_inherited_local_boundaries_survive_append(self) -> None:
         first = history_page(["r1", "r2", "r3"], ["r4", "r5"], 2)
         self.assertEqual([r["ordinal"] for r in first], [4, 5])
@@ -754,6 +743,32 @@ class ContractTests(unittest.TestCase):
             )
             self.assertEqual(control.returncode, 0, control.stderr)
             self.assertIn("PASS: candidate", control.stdout)
+            original = yaml.safe_load((root / "contracts/openapi.yaml").read_text())
+            for mutation in (
+                "csrf-value",
+                "login-cookie-missing",
+                "logout-expiry-policy",
+            ):
+                import copy
+
+                changed = copy.deepcopy(original)
+                reason = mutate_auth(changed, mutation)
+                write_api(root / "contracts", changed)
+                failed = subprocess.run(
+                    ["make", "contract-check"],
+                    cwd=root,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=30,
+                )
+                self.assertNotEqual(failed.returncode, 0, mutation)
+                self.assertIn(reason, failed.stderr)
+                self.assertNotIn("PASS: candidate", failed.stdout)
+                print(
+                    f"Make semantic mutation {mutation}: exit {failed.returncode}; {reason}"
+                )
             (root / "contracts/openapi.yaml").write_text("invalid: [")
             result = subprocess.run(
                 ["make", "contract-check"],

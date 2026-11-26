@@ -209,3 +209,15 @@ CLI-05/08/10/11/14/15 validate runtime pagination/selection/scrolling. T12/T16/
 T18/T19/T27 validate transactions, fences, provider cancellation and streaming.
 No fixture proves database concurrency, TLS, cursor cryptography or runtime
 conformance. Candidate 1.0.0 and human approval remain pending.
+
+S01 independent-review R1 is resolved at the contract level by owner-approved
+S01-DISCOVERY in [HTTP semantics](contracts/HTTP_SEMANTICS.md): distinct strict
+ConversationDetail with required nullable active_run_id, snapshot/visibility and
+read-only lifecycle rules, public discovery/status/SSE/history transcripts. R2
+normalizes chronological timestamp instants and UUID identities for both keyset
+operations. R3 binds authentication checks to referenced parameter/header
+definitions and tests semantic mutations after refreshing disposable checksums.
+Executable traceability: `tests/contracts/test_remediation.py`, the actual Make
+failure probes in `tests/contracts/test_contracts.py`, and governed discovery and
+listing fixtures. Runtime owners: T10/T11, conformance T20/T28 and CLI-03/10/11/14/15.
+Renewed independent review and human approval remain pending.

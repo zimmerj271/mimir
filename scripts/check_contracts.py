@@ -40,6 +40,45 @@ AUTH_POLICY = {
     "trusted_host_required": True,
     "credentialed_cross_origin": False,
 }
+BROWSER_REQUIREMENTS = {
+    "BrowserCSRF": {
+        "clients": ["web"],
+        "mutations": "required",
+        "authenticated_get": "not_required",
+        "cli": "not_required",
+    },
+    "BrowserOrigin": {
+        "clients": ["web"],
+        "mutations": "exact_configured_origin_required",
+        "authenticated_get": "reject_unauthorized_if_present",
+        "trust_from_host_or_forwarded": False,
+    },
+}
+BROWSER_DESCRIPTIONS = {
+    "BrowserCSRF": "Required with exact configured Origin for browser mutations including web login/logout. CLI bearer needs no CSRF. Failure is 403 forbidden. Conditional requirement cannot be enforced by security alternatives.",
+    "BrowserOrigin": "Browser mutations require exact configured trusted origin; reject missing/null/malformed/unauthorized. Authenticated GET rejects unauthorized Origin if present. Host/forwarded headers do not establish trust.",
+}
+COOKIE_DESCRIPTIONS = {
+    "SessionCookie": "Web login only; required for web, absent for CLI. __Host-mimir_session with HttpOnly; Secure; SameSite=Strict; Path=/; no Domain; Max-Age bounded by remaining absolute lifetime. Never include cookie values in examples.",
+    "ExpiredSessionCookie": "Web logout expires __Host-mimir_session with Max-Age=0 and matching Path=/; HttpOnly; Secure; SameSite=Strict; no Domain. CLI logout has no session cookie.",
+}
+COOKIE_POLICIES = {
+    name: {
+        "name": "__Host-mimir_session",
+        "http_only": True,
+        "secure": True,
+        "same_site": "Strict",
+        "path": "/",
+        "domain": None,
+        "required_for": "web",
+        "forbidden_for": "cli",
+        "transport": "https",
+        "max_age": "positive_bounded_by_remaining_absolute_seconds"
+        if name == "SessionCookie"
+        else 0,
+    }
+    for name in COOKIE_DESCRIPTIONS
+}
 ERROR_CODES = {
     "unauthenticated": 401,
     "forbidden": 403,
@@ -222,7 +261,11 @@ class ContractChecker:
             schema = (
                 self.sse
                 if reference == "sse"
-                else {"$ref": reference, "components": self.api["components"]}
+                else {
+                    "$ref": reference,
+                    "components": self.api["components"],
+                    "paths": self.api["paths"],
+                }
             )
             if reference != "sse":
                 self.pointer(self.api, reference)
@@ -290,6 +333,8 @@ class ContractChecker:
             "cookie scheme drift",
         )
         schemas = self.api["components"]["schemas"]
+        self.check_discovery()
+        self.check_authentication_headers()
         require(
             schemas["Message"]["properties"]["status"]["enum"] == ["completed"],
             "canonical message status drift",
@@ -406,34 +451,6 @@ class ContractChecker:
             },
             "login discriminator agreement drift",
         )
-        for opid, status in (
-            ("login", "201"),
-            ("getSession", "200"),
-            ("logout", "204"),
-        ):
-            method, path = self.operations()[opid]
-            headers = self.api["paths"][path][method]["responses"][status]["headers"]
-            require(
-                headers["Cache-Control"] == {"$ref": "#/components/headers/NoStore"},
-                "no-store missing",
-            )
-        require(
-            self.api["components"]["headers"]["NoStore"]["schema"]
-            == {"type": "string", "const": "no-store"},
-            "no-store header drift",
-        )
-        for name in ("SessionCookie", "ExpiredSessionCookie"):
-            description = self.api["components"]["headers"][name]["description"]
-            for term in (
-                "__Host-mimir_session",
-                "HttpOnly",
-                "Secure",
-                "SameSite=Strict",
-                "Path=/",
-                "no Domain",
-                "Max-Age",
-            ):
-                require(term in description, "cookie scope/security drift")
         require(
             schemas["MessageContent"]["properties"]["text"].get("x-max-utf8-bytes")
             == 1048576,
@@ -444,11 +461,105 @@ class ContractChecker:
             == 1048576,
             "standalone UTF-8 bound missing",
         )
-        for ident in ("S01-AUTH", "S01-CANCEL", "S01-PAGE"):
+        for ident in ("S01-AUTH", "S01-CANCEL", "S01-PAGE", "S01-DISCOVERY"):
             require(
                 ident in (self.directory / "HTTP_SEMANTICS.md").read_text(),
                 "approved addendum missing",
             )
+
+    def check_discovery(self) -> None:
+        schemas = self.api["components"]["schemas"]
+        summary = schemas["Conversation"]
+        detail = schemas.get("ConversationDetail", {})
+        require(
+            self.api["paths"]["/api/v1/conversations/{id}"]["get"]["responses"]["200"][
+                "content"
+            ]["application/json"]["schema"]
+            == {"$ref": "#/components/schemas/ConversationDetail"},
+            "conversation discovery response must reference ConversationDetail",
+        )
+        require(
+            "active_run_id" not in summary["properties"]
+            and detail.get("type") == "object"
+            and detail.get("additionalProperties") is False
+            and detail.get("required") == summary["required"] + ["active_run_id"]
+            and detail.get("properties")
+            == {
+                **summary["properties"],
+                "active_run_id": {
+                    "type": ["string", "null"],
+                    "format": "uuid",
+                    "readOnly": True,
+                    "description": "S01-DISCOVERY: eligible nonterminal conversational run at the same read snapshot, or null; always present. Derived reference; no canonical version/timestamp update.",
+                },
+            },
+            "conversation discovery strict schema/required nullable UUID drift",
+        )
+        for opid in ("createConversation", "patchConversation", "createBranch"):
+            method, path = self.operations()[opid]
+            responses = self.api["paths"][path][method]["responses"]
+            status = "201" if opid != "patchConversation" else "200"
+            require(
+                responses[status]["content"]["application/json"]["schema"]
+                == {"$ref": "#/components/schemas/Conversation"},
+                "conversation summary response changed",
+            )
+        require(
+            schemas["ListConversations"]["properties"]["items"]["items"]
+            == {"$ref": "#/components/schemas/Conversation"},
+            "conversation listing summary changed",
+        )
+
+    def check_authentication_headers(self) -> None:
+        for name, header_name, schema in (
+            ("BrowserCSRF", "X-Mimir-CSRF", {"type": "string", "const": "1"}),
+            ("BrowserOrigin", "Origin", {"type": "string"}),
+        ):
+            parameter = self.pointer(self.api, f"#/components/parameters/{name}")
+            require(
+                parameter.get("name") == header_name
+                and parameter.get("in") == "header"
+                and parameter.get("required") is False
+                and parameter.get("schema") == schema
+                and parameter.get("description") == BROWSER_DESCRIPTIONS[name]
+                and parameter.get("x-mimir-browser-requirement")
+                == BROWSER_REQUIREMENTS[name],
+                f"authentication {name} definition/conditional requirement drift",
+            )
+        for opid, status, cookie in (
+            ("login", "201", "SessionCookie"),
+            ("getSession", "200", None),
+            ("logout", "204", "ExpiredSessionCookie"),
+        ):
+            method, path = self.operations()[opid]
+            headers = self.api["paths"][path][method]["responses"][status].get(
+                "headers", {}
+            )
+            require(
+                headers.get("Cache-Control")
+                == {"$ref": "#/components/headers/NoStore"},
+                f"authentication {opid} Cache-Control wiring drift",
+            )
+            if cookie:
+                require(
+                    headers.get("Set-Cookie")
+                    == {"$ref": f"#/components/headers/{cookie}"},
+                    f"authentication {opid} Set-Cookie wiring drift",
+                )
+                definition = self.pointer(self.api, headers["Set-Cookie"]["$ref"])
+                require(
+                    definition.get("schema") == {"type": "string"}
+                    and definition.get("required", False) is False
+                    and definition.get("x-mimir-cookie") == COOKIE_POLICIES[cookie]
+                    and definition.get("description") == COOKIE_DESCRIPTIONS[cookie],
+                    f"authentication {cookie} issuance/security/expiry agreement drift",
+                )
+        no_store = self.pointer(self.api, "#/components/headers/NoStore")
+        require(
+            no_store.get("schema") == {"type": "string", "const": "no-store"}
+            and no_store.get("required") is True,
+            "authentication NoStore header drift",
+        )
 
     def check_manifest(self) -> None:
         manifest = read_json(self.directory / "manifest.json")

@@ -29,3 +29,9 @@ Apply repository `AGENTS.md` and language `CODING_STANDARDS.md`. Before writing 
 At completion, **STOP**. Open one task-scoped PR using the root `PR_REVIEW_TEMPLATE.md`. Require successful documented checks, independent coding-agent review, explicit human review and affirmative merge approval. Do not merge autonomously or begin the next task before merge confirmation and a fresh human assignment. See `AGENTS.md` and `QUALITY_GATES.md`.
 
 **V1 normative references:** `CONTRACT_DECISIONS_V1.md`, `STATE_MACHINES.md`, `PROMPT_AND_MEMORY_CONTRACT.md`, `contracts/openapi.yaml`, `contracts/sse.schema.json`, and `contracts/errors.json` at unified-package root. These are consumed from the one shared `/contracts` directory in the monorepo; without separate copies.
+
+## Owner-approved S01-DISCOVERY obligation
+
+Verify actual owner-scoped detail → Run GET → snapshot-first SSE → canonical-history conformance, including null, 404 isolation/fences, dependency failures, requested cancellation, standalone/terminal exclusion and completion between reads. No automatic resubmission or fabricated cancellation. Coordinate real client conformance with CLI-03/10/11/14/15 without implementing Go here.
+
+See the single canonical [S01-DISCOVERY decision](../../contracts/HTTP_SEMANTICS.md). This adds downstream acceptance obligations only; no runtime implementation or test success is claimed by S01.

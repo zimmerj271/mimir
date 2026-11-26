@@ -119,3 +119,24 @@ flattened inherited-plus-offset-local visible ordinals. No runtime or applied SQ
 changes are authorized or made by S01. Runtime services/transactions must enforce
 the added HTTP requirements in their assigned tasks. The initial contract remains
 1.0.0 and a candidate pending independent review and explicit human approval.
+
+## Owner-approved S01 independent-review remediation
+
+**S01-DISCOVERY (R1):** The owner explicitly approved ConversationDetail on the
+existing conversation GET, with required nullable active_run_id. Summary schemas
+stay unchanged. The field derives an owner-visible, unfenced pending/running
+conversational run (including requested cancellation), from the same authoritative
+read snapshot as metadata. Null is only absence on an accessible conversation;
+404 conceals inaccessible conversation/run existence and dependency errors remain
+errors. No canonical version/timestamp mutation, persisted column, migration or
+new endpoint. Client detail → run GET → snapshot-first SSE → canonical history
+handles completion races without resubmission or inferred IDs. Full semantics and
+T10/T11/T20/T28/CLI-03/10/11/14/15 ownership are in
+[HTTP semantics](../../contracts/HTTP_SEMANTICS.md). Runtime remains deferred.
+
+**R2/R3:** The owner approved exact chronological/UUID normalization in the
+contract reference model and stronger authentication definition/header wiring and
+semantic mutation tests. S01-PAGE and S01-AUTH public behavior is unchanged.
+Contract 1.0.0 remains the initial candidate, pending renewed independent review
+and explicit human contract/merge approval. This approval authorizes remediation,
+not acceptance of findings by the independent reviewer or task completion.

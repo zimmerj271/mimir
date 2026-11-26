@@ -138,3 +138,13 @@ These ideas **are not v1 requirements**. All additional future work must be reco
 
 ## V1 resolution and review authority
 The selected v1 behavior baseline is `CONTRACT_DECISIONS_V1.md`, with lifecycle rules in `STATE_MACHINES.md`, context format in `PROMPT_AND_MEMORY_CONTRACT.md`, and wire schemas in `contracts/`. Older wording describing G01–G15 as unanswered or suggesting T20 may choose public payload shapes is superseded. Every feature PR must pass the **mandatory stop / independent-agent + human review** in `PR_REVIEW_TEMPLATE.md`; no subsequent branch work before authorized merge and reassignment.
+
+## S01-DISCOVERY derived projection
+
+T10's owner-scoped conversation repository/service boundary supplies a consistent
+metadata/runtime read snapshot; T11 exposes the approved ConversationDetail with
+required nullable active_run_id. Use existing V005 model_runs/active-conversation
+partial uniqueness, owner scope/RLS/visibility/deletion fences; no additional
+canonical state, migration, version increment or activity timestamp update.
+T20/T28 verify actual schema and client conformance. S01 supplies contract-only
+agreement scenarios; see [HTTP semantics](../contracts/HTTP_SEMANTICS.md).

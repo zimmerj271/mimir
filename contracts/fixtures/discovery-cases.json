@@ -1,0 +1,1346 @@
+[
+  {
+    "name": "pending",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "pending",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc/events"
+    ],
+    "status_response": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "pending",
+      "checkpoint_text": "",
+      "checkpoint_sequence": 0,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": false
+    },
+    "attachment_snapshot": {
+      "event": "run.snapshot",
+      "event_version": 1,
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "snapshot_sequence": 0,
+      "text": "",
+      "status": "pending"
+    }
+  },
+  {
+    "name": "running",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc/events"
+    ],
+    "status_response": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "running",
+      "checkpoint_text": "",
+      "checkpoint_sequence": 0,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": false
+    },
+    "attachment_snapshot": {
+      "event": "run.snapshot",
+      "event_version": 1,
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "snapshot_sequence": 0,
+      "text": "",
+      "status": "running"
+    }
+  },
+  {
+    "name": "cancellation-requested",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": true
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc/events"
+    ],
+    "status_response": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "running",
+      "checkpoint_text": "",
+      "checkpoint_sequence": 0,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": true
+    },
+    "attachment_snapshot": {
+      "event": "run.snapshot",
+      "event_version": 1,
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "snapshot_sequence": 0,
+      "text": "",
+      "status": "running"
+    }
+  },
+  {
+    "name": "no-active-run",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": []
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": null
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "history_response": {
+      "items": [],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "exclude-completed",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "completed",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": "Synthetic result",
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": "2026-11-20T00:00:01Z",
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": null
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "history_response": {
+      "items": [],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "exclude-failed",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "failed",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": "2026-11-20T00:00:01Z",
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": null
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "history_response": {
+      "items": [],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "exclude-cancelled",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "cancelled",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": "2026-11-20T00:00:01Z",
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": null
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "history_response": {
+      "items": [],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "exclude-interrupted",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "interrupted",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": "2026-11-20T00:00:01Z",
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": null
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "history_response": {
+      "items": [],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "exclude-standalone",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "standalone",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": null
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "history_response": {
+      "items": [],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "foreign-run",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000011",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": null
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "history_response": {
+      "items": [],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "other-conversation-run",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000003",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": null
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "history_response": {
+      "items": [],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "inaccessible-run",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": false,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": null
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "history_response": {
+      "items": [],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "fenced-run",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": true
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": null
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "history_response": {
+      "items": [],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "foreign-conversation",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000011",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 404,
+    "response": {
+      "error": {
+        "code": "not_found",
+        "message": "Unavailable",
+        "details": {}
+      },
+      "request_id": "synthetic-request"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002"
+    ]
+  },
+  {
+    "name": "inaccessible-conversation",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": false,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 404,
+    "response": {
+      "error": {
+        "code": "not_found",
+        "message": "Unavailable",
+        "details": {}
+      },
+      "request_id": "synthetic-request"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002"
+    ]
+  },
+  {
+    "name": "fenced-conversation",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": true
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 404,
+    "response": {
+      "error": {
+        "code": "not_found",
+        "message": "Unavailable",
+        "details": {}
+      },
+      "request_id": "synthetic-request"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002"
+    ]
+  },
+  {
+    "name": "nonexistent-conversation",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": false,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 404,
+    "response": {
+      "error": {
+        "code": "not_found",
+        "message": "Unavailable",
+        "details": {}
+      },
+      "request_id": "synthetic-request"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002"
+    ]
+  },
+  {
+    "name": "runtime-unavailable",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ],
+      "runtime_available": false
+    },
+    "http_status": 503,
+    "response": {
+      "error": {
+        "code": "dependency_unavailable",
+        "message": "Unavailable",
+        "details": {}
+      },
+      "request_id": "synthetic-request"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002"
+    ]
+  },
+  {
+    "name": "completion-before-status",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "status_response": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "completed",
+      "checkpoint_text": "",
+      "checkpoint_sequence": 0,
+      "final_text": "Synthetic result",
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-20T00:00:01Z",
+      "cancellation_requested": false
+    },
+    "history_response": {
+      "items": [
+        {
+          "message_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+          "revision_id": "0199a1b2-c3d4-7e8f-9123-123456789abd",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "role": "assistant",
+          "status": "completed",
+          "ordinal": 1,
+          "content": {
+            "format": "text/v1",
+            "text": "Synthetic result"
+          },
+          "created_at": "2026-11-24T00:00:00Z"
+        }
+      ],
+      "next_cursor": null
+    }
+  },
+  {
+    "name": "completion-before-attachment",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc/events",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002/messages"
+    ],
+    "status_response": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "running",
+      "checkpoint_text": "",
+      "checkpoint_sequence": 0,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": false
+    },
+    "attachment_snapshot": {
+      "event": "run.snapshot",
+      "event_version": 1,
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "snapshot_sequence": 0,
+      "text": "Synthetic result",
+      "status": "completed"
+    },
+    "history_response": {
+      "items": [
+        {
+          "message_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+          "revision_id": "0199a1b2-c3d4-7e8f-9123-123456789abd",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "role": "assistant",
+          "status": "completed",
+          "ordinal": 1,
+          "content": {
+            "format": "text/v1",
+            "text": "Synthetic result"
+          },
+          "created_at": "2026-11-24T00:00:00Z"
+        }
+      ],
+      "next_cursor": null
+    },
+    "terminal_response": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "completed",
+      "checkpoint_text": "",
+      "checkpoint_sequence": 0,
+      "final_text": "Synthetic result",
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": "2026-11-20T00:00:01Z",
+      "cancellation_requested": false
+    }
+  },
+  {
+    "name": "latest-active-across-pages",
+    "authenticated_owner": "0199a1b2-c3d4-7e8f-9123-000000000010",
+    "snapshot": {
+      "conversation": {
+        "body": {
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "project_id": null,
+          "title": "Synthetic conversation",
+          "conversation_version": 1,
+          "status": "active",
+          "updated_at": "2026-11-20T00:00:00.5Z"
+        },
+        "exists": true,
+        "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+        "accessible": true,
+        "fenced": false
+      },
+      "runs": [
+        {
+          "body": {
+            "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+            "kind": "conversation",
+            "status": "running",
+            "checkpoint_text": "",
+            "checkpoint_sequence": 0,
+            "final_text": null,
+            "error_code": null,
+            "created_at": "2026-11-24T00:00:00Z",
+            "completed_at": null,
+            "cancellation_requested": false
+          },
+          "owner_id": "0199a1b2-c3d4-7e8f-9123-000000000010",
+          "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+          "accessible": true,
+          "fenced": false
+        }
+      ]
+    },
+    "http_status": 200,
+    "response": {
+      "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+      "project_id": null,
+      "title": "Synthetic conversation",
+      "conversation_version": 1,
+      "status": "active",
+      "updated_at": "2026-11-20T00:00:00.5Z",
+      "active_run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc"
+    },
+    "expected_requests": [
+      "GET /api/v1/conversations",
+      "GET /api/v1/conversations?cursor=synthetic-opaque-boundary",
+      "GET /api/v1/conversations/0199a1b2-c3d4-7e8f-9123-000000000002",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "GET /api/v1/runs/0199a1b2-c3d4-7e8f-9123-123456789abc/events"
+    ],
+    "status_response": {
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "kind": "conversation",
+      "status": "running",
+      "checkpoint_text": "",
+      "checkpoint_sequence": 0,
+      "final_text": null,
+      "error_code": null,
+      "created_at": "2026-11-24T00:00:00Z",
+      "completed_at": null,
+      "cancellation_requested": false
+    },
+    "attachment_snapshot": {
+      "event": "run.snapshot",
+      "event_version": 1,
+      "run_id": "0199a1b2-c3d4-7e8f-9123-123456789abc",
+      "snapshot_sequence": 0,
+      "text": "",
+      "status": "running"
+    },
+    "listing_pages": [
+      {
+        "items": [
+          {
+            "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000003",
+            "project_id": null,
+            "title": "Synthetic conversation",
+            "conversation_version": 1,
+            "status": "archived",
+            "updated_at": "2026-11-20T00:00:01Z"
+          }
+        ],
+        "next_cursor": "synthetic-opaque-boundary"
+      },
+      {
+        "items": [
+          {
+            "conversation_id": "0199a1b2-c3d4-7e8f-9123-000000000002",
+            "project_id": null,
+            "title": "Synthetic conversation",
+            "conversation_version": 1,
+            "status": "active",
+            "updated_at": "2026-11-20T00:00:00.5Z"
+          }
+        ],
+        "next_cursor": null
+      }
+    ]
+  }
+]

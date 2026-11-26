@@ -1064,9 +1064,10 @@
         }
       ],
       "tests": [
-        "tests/contracts/test_contracts.py"
+        "tests/contracts/test_contracts.py",
+        "tests/contracts/test_remediation.py"
       ],
-      "evidence": "docs/verification/S01.md; agent locked contract/toolchain checks passed; human full backend-check passed (105 tests), verified against unchanged fingerprinted inputs. Runtime producer/consumer conformance and candidate approval pending."
+      "evidence": "docs/verification/S01_REMEDIATION.md; new R1\u2013R3 contract-only scenarios/mutations and locked validation. Runtime conformance, renewed independent review and candidate approval remain pending."
     }
   }
 }

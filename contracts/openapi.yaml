@@ -706,13 +706,14 @@ paths:
   /api/v1/conversations/{id}:
     get:
       operationId: getConversation
+      description: "S01-DISCOVERY: metadata and required nullable active_run_id share one authoritative read snapshot; enforce owner visibility/RLS/fences before disclosure. See HTTP_SEMANTICS.md."
       responses:
         '200':
           description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Conversation'
+                $ref: '#/components/schemas/ConversationDetail'
         '400':
           description: Typed error; see error catalog
           content:
@@ -1490,6 +1491,7 @@ components:
       in: header
       required: false
       description: Required with exact configured Origin for browser mutations including web login/logout. CLI bearer needs no CSRF. Failure is 403 forbidden. Conditional requirement cannot be enforced by security alternatives.
+      x-mimir-browser-requirement: {"clients": ["web"], "mutations": "required", "authenticated_get": "not_required", "cli": "not_required"}
       schema:
         type: string
         const: '1'
@@ -1498,6 +1500,7 @@ components:
       in: header
       required: false
       description: Browser mutations require exact configured trusted origin; reject missing/null/malformed/unauthorized. Authenticated GET rejects unauthorized Origin if present. Host/forwarded headers do not establish trust.
+      x-mimir-browser-requirement: {"clients": ["web"], "mutations": "exact_configured_origin_required", "authenticated_get": "reject_unauthorized_if_present", "trust_from_host_or_forwarded": false}
       schema:
         type: string
   headers:
@@ -1509,10 +1512,12 @@ components:
         const: no-store
     SessionCookie:
       description: Web login only; required for web, absent for CLI. __Host-mimir_session with HttpOnly; Secure; SameSite=Strict; Path=/; no Domain; Max-Age bounded by remaining absolute lifetime. Never include cookie values in examples.
+      x-mimir-cookie: {"name": "__Host-mimir_session", "http_only": true, "secure": true, "same_site": "Strict", "path": "/", "domain": null, "required_for": "web", "forbidden_for": "cli", "transport": "https", "max_age": "positive_bounded_by_remaining_absolute_seconds"}
       schema:
         type: string
     ExpiredSessionCookie:
       description: Web logout expires __Host-mimir_session with Max-Age=0 and matching Path=/; HttpOnly; Secure; SameSite=Strict; no Domain. CLI logout has no session cookie.
+      x-mimir-cookie: {"name": "__Host-mimir_session", "http_only": true, "secure": true, "same_site": "Strict", "path": "/", "domain": null, "required_for": "web", "forbidden_for": "cli", "transport": "https", "max_age": 0}
       schema:
         type: string
   schemas:
@@ -1600,7 +1605,7 @@ components:
     Conversation:
       type: object
       additionalProperties: false
-      properties:
+      properties: &conversationProperties
         conversation_id: *id004
         project_id:
           oneOf:
@@ -1622,6 +1627,24 @@ components:
       - conversation_version
       - status
       - updated_at
+    ConversationDetail:
+      type: object
+      additionalProperties: false
+      properties:
+        <<: *conversationProperties
+        active_run_id:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+          description: "S01-DISCOVERY: eligible nonterminal conversational run at the same read snapshot, or null; always present. Derived reference; no canonical version/timestamp update."
+      required:
+      - conversation_id
+      - project_id
+      - title
+      - conversation_version
+      - status
+      - updated_at
+      - active_run_id
     MessageContent:
       type: object
       additionalProperties: false

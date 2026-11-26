@@ -7,7 +7,12 @@ CSRF enforcement, cryptographic cursor integrity, SQL atomicity or CLI behavior.
 from __future__ import annotations
 
 import json
+import re
+from datetime import UTC, datetime
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlencode
+from uuid import UUID
 
 from check_contracts import TERMINAL, ContractError, require, unique_pairs
 
@@ -147,6 +152,31 @@ def auth_outcome(case: dict[str, Any]) -> tuple[bool, int | None, str | None]:
     return True, None, None
 
 
+def chronological_key(timestamp: str, identity: str) -> tuple[Fraction, int]:
+    """Exact instants, including sub-microsecond fractions, and UUID identities.
+
+    datetime parses the integral second and offset only. Fraction retains every
+    supplied fractional digit; neither float nor datetime precision truncates it.
+    This is an agreement model, not a timestamp representation restriction.
+    """
+    match = re.fullmatch(
+        r"(\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2})(?:\.(\d+))?([Zz]|[+-]\d{2}:\d{2})",
+        timestamp,
+    )
+    require(match is not None, "invalid keyset timestamp")
+    assert match is not None
+    try:
+        instant = datetime.fromisoformat(match[1] + match[3].upper())
+        elapsed = instant - datetime(1970, 1, 1, tzinfo=UTC)
+        digits = match[2] or "0"
+        seconds = Fraction(elapsed.days * 86400 + elapsed.seconds) + Fraction(
+            int(digits), 10 ** len(digits)
+        )
+        return seconds, UUID(identity).int
+    except ValueError, OverflowError:
+        raise ContractError("invalid chronological keyset") from None
+
+
 def ordered_page(
     rows: list[dict[str, Any]],
     fields: tuple[str, str],
@@ -161,12 +191,167 @@ def ordered_page(
         and not r.get("fenced", False)
     ]
     if boundary is not None:
+        boundary_key = chronological_key(*boundary)
         eligible = [
-            r for r in eligible if tuple(r[f] for f in fields) < tuple(boundary)
+            r
+            for r in eligible
+            if chronological_key(r[fields[0]], r[fields[1]]) < boundary_key
         ]
-    return sorted(eligible, key=lambda r: tuple(r[f] for f in fields), reverse=True)[
-        :limit
-    ]
+    return sorted(
+        eligible,
+        key=lambda r: chronological_key(r[fields[0]], r[fields[1]]),
+        reverse=True,
+    )[:limit]
+
+
+class ConversationDiscovery:
+    """Contract-only read/attach transcript; synthetic snapshot facts, no DB/HTTP.
+
+    The client consumes only schema-validated public responses. Separate server
+    facts check eligibility at one synthetic read snapshot, never proving RLS or
+    SQL snapshot consistency. Requests are derived from public identities only.
+    """
+
+    def __init__(self, checker: ContractChecker) -> None:
+        self.checker = checker
+
+    def request(self, operation_id: str, identity: str) -> str:
+        method, path = self.checker.operations()[operation_id]
+        require(method == "get", "discovery/recovery never resubmits or cancels")
+        operation = self.checker.api["paths"][path][method]
+        for index, parameter in enumerate(operation["parameters"]):
+            if parameter.get("in") == "path":
+                escaped = path.replace("~", "~0").replace("/", "~1")
+                self.checker.validate(
+                    identity,
+                    f"#/paths/{escaped}/{method}/parameters/{index}/schema",
+                )
+                return "GET " + path.replace("{" + parameter["name"] + "}", identity)
+        raise ContractError("discovery request path parameter missing")
+
+    def check(self, case: dict[str, Any]) -> list[str]:
+        facts = case["snapshot"]
+        conversation = facts["conversation"]
+        conversation_id = conversation["body"]["conversation_id"]
+        requests = []
+        if "listing_pages" in case:
+            method, path = self.checker.operations()["listConversations"]
+            require(method == "get", "listing is read-only")
+            cursor = None
+            selected = None
+            for page in case["listing_pages"]:
+                requests.append(
+                    "GET "
+                    + path
+                    + ("?" + urlencode({"cursor": cursor}) if cursor else "")
+                )
+                self.checker.validate(page, "#/components/schemas/ListConversations")
+                selected = next(
+                    (
+                        row["conversation_id"]
+                        for row in page["items"]
+                        if row["status"] == "active"
+                    ),
+                    None,
+                )
+                if selected:
+                    break
+                cursor = page["next_cursor"]
+                require(
+                    cursor is not None, "no eligible selection at listing exhaustion"
+                )
+            require(
+                selected == conversation_id,
+                "latest eligible public conversation mismatch",
+            )
+        requests.append(self.request("getConversation", conversation_id))
+        accessible = (
+            conversation["exists"]
+            and conversation["owner_id"] == case["authenticated_owner"]
+            and conversation["accessible"]
+            and not conversation["fenced"]
+        )
+        if not accessible or not facts.get("runtime_available", True):
+            http_status = 404 if not accessible else 503
+            code = "not_found" if http_status == 404 else "dependency_unavailable"
+            self.checker.validate(case["response"], "#/components/schemas/Error")
+            require(
+                case["http_status"] == http_status
+                and case["response"]["error"]["code"] == code
+                and case["response"]["error"]["details"] == {},
+                "discovery denial/dependency failure must not disclose run identity",
+            )
+            return requests
+        self.checker.validate(conversation["body"], "#/components/schemas/Conversation")
+        detail = case["response"]
+        self.checker.validate(detail, "#/components/schemas/ConversationDetail")
+        require(case["http_status"] == 200, "accessible discovery status")
+        require(
+            {key: detail[key] for key in conversation["body"]} == conversation["body"],
+            "discovery changes no canonical metadata/version/timestamp",
+        )
+        eligible = []
+        for candidate in facts["runs"]:
+            run = candidate["body"]
+            self.checker.validate(run, "#/components/schemas/Run")
+            if (
+                run["kind"] == "conversation"
+                and run["status"] in {"pending", "running"}
+                and candidate["owner_id"] == case["authenticated_owner"]
+                and candidate["conversation_id"] == conversation_id
+                and candidate["accessible"]
+                and not candidate["fenced"]
+            ):
+                eligible.append(run["run_id"])
+        require(len(eligible) <= 1, "one active conversational run per snapshot")
+        require(
+            detail["active_run_id"] == (eligible[0] if eligible else None),
+            "active-run discovery eligibility mismatch",
+        )
+        run_id = detail["active_run_id"]
+        if run_id is not None:
+            requests.append(self.request("getRun", run_id))
+            status_run = case["status_response"]
+            self.checker.validate(status_run, "#/components/schemas/Run")
+            require(
+                status_run["run_id"] == run_id and status_run["kind"] == "conversation",
+                "discovered/status run identity mismatch",
+            )
+            status: str | None = status_run["status"]
+            if status not in TERMINAL:
+                requests.append(self.request("subscribeRun", run_id))
+                snapshot = case["attachment_snapshot"]
+                require(snapshot["run_id"] == run_id, "attachment identity mismatch")
+                stream = SSETranscript(self.checker)
+                stream.attach(snapshot)
+                status = stream.status
+                if status in TERMINAL:
+                    requests.append(self.request("getRun", run_id))
+                    status_run = case["terminal_response"]
+                    self.checker.validate(status_run, "#/components/schemas/Run")
+                    require(
+                        status_run["run_id"] == run_id
+                        and status_run["kind"] == "conversation"
+                        and status_run["status"] == status,
+                        "terminal snapshot requires authoritative Run confirmation",
+                    )
+            if status not in TERMINAL:
+                return requests
+        requests.append(self.request("listMessages", conversation_id))
+        self.checker.validate(
+            case["history_response"], "#/components/schemas/ListMessages"
+        )
+        if run_id is not None and status == "completed":
+            require(
+                any(
+                    message["role"] == "assistant"
+                    and message["conversation_id"] == conversation_id
+                    and message["content"]["text"] == status_run["final_text"]
+                    for message in case["history_response"]["items"]
+                ),
+                "completion recovery requires canonical committed history",
+            )
+        return requests
 
 
 def history_page(
@@ -193,7 +378,13 @@ def cursor_agreement(scope: dict[str, Any], cursor: dict[str, Any]) -> None:
 def check_scenarios(checker: ContractChecker, kind: str, cases: Any) -> None:
     require(isinstance(cases, list) and cases, "scenario fixture must be nonempty list")
     for case in cases:
-        if kind == "cancellation":
+        if kind == "discovery":
+            requests = ConversationDiscovery(checker).check(case)
+            require(
+                requests == case["expected_requests"],
+                "discovery request transcript drift",
+            )
+        elif kind == "cancellation":
             cancellation(checker, case["http_status"], case["run"])
         elif kind == "cookie_policy":
             require(case["name"] == "__Host-mimir_session", "cookie name drift")

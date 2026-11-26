@@ -291,3 +291,16 @@ These follow-ups are bounded engineering specifications; none justifies silently
 
 ## V1 resolution and review authority
 The selected v1 behavior baseline is `CONTRACT_DECISIONS_V1.md`, with lifecycle rules in `STATE_MACHINES.md`, context format in `PROMPT_AND_MEMORY_CONTRACT.md`, and wire schemas in `contracts/`. Older wording describing G01–G15 as unanswered or suggesting T20 may choose public payload shapes is superseded. Every feature PR must pass the **mandatory stop / independent-agent + human review** in `PR_REVIEW_TEMPLATE.md`; no subsequent branch work before authorized merge and reassignment.
+
+## S01-DISCOVERY launch and reattachment
+
+After latest-active listing traversal or explicit selection, consume
+ConversationDetail from conversation GET. Its required active_run_id is nullable;
+null loads history normally, while a UUID supplies the existing Run GET and then
+SSE attachment path. Never derive IDs from messages/timestamps/cached submissions.
+A completion between any two reads is normal: inspect authoritative state,
+accept a terminal initial SSE snapshot and reconcile canonical history. Never
+invent cancellation or automatically submit another prompt. Ambiguous submission
+operation/idempotency recovery remains separate. CLI-03 owns typed consumption,
+CLI-10 selection, CLI-11 history, CLI-14 streaming and CLI-15 startup/resume and
+recovery; see [the full contract](../contracts/HTTP_SEMANTICS.md).

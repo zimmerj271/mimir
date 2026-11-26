@@ -87,3 +87,13 @@ This contract work does not implement handlers or verify runtime conformance.
 
 ## V1 resolution and review authority
 The selected v1 behavior baseline is `CONTRACT_DECISIONS_V1.md`, with lifecycle rules in `STATE_MACHINES.md`, context format in `PROMPT_AND_MEMORY_CONTRACT.md`, and wire schemas in `contracts/`. Older wording describing G01–G15 as unanswered or suggesting T20 may choose public payload shapes is superseded. Every feature PR must pass the **mandatory stop / independent-agent + human review** in `PR_REVIEW_TEMPLATE.md`; no subsequent branch work before authorized merge and reassignment.
+
+## S01-DISCOVERY (owner-approved R1)
+
+Conversation GET 200 alone uses ConversationDetail, adding required nullable UUID
+active_run_id to the unchanged summary properties. Same-snapshot owner/RLS/fence
+checks and V005 derived eligibility are mandatory; no canonical version/timestamp
+change. Summary responses remain Conversation. Detail → run GET → snapshot-first
+SSE → canonical history handles completion races without new submissions. Null
+never hides authorization or dependency failure. See
+[the complete decision and ownership](../contracts/HTTP_SEMANTICS.md).
