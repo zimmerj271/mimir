@@ -402,3 +402,22 @@ def test_admin_main_redacts_credential_failures(tmp_path, capsys):
     output = capsys.readouterr()
     assert output.out == ""
     assert output.err == "Unable to read administrator input or credentials\n"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "issued_kind,presented_kind",
+    [(ClientType.CLI, ClientType.WEB), (ClientType.WEB, ClientType.CLI)],
+)
+async def test_transport_mismatch_cannot_slide_idle_expiry(
+    services, issued_kind, presented_kind
+):
+    admin, auth, repository, _, _ = services
+    await admin.provision("Alice", "synthetic password")
+    issued = await auth.login("Alice", "synthetic password", issued_kind)
+    with patch.object(
+        repository, "renew_session", wraps=repository.renew_session
+    ) as renewal:
+        with pytest.raises(AuthenticationRejected):
+            await auth.authenticate(issued.token, presented_kind)
+        renewal.assert_not_called()
