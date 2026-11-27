@@ -3,7 +3,7 @@
 from collections.abc import AsyncIterator, Callable, Coroutine
 from contextlib import asynccontextmanager
 from datetime import datetime
-from json import JSONDecodeError
+from json import JSONDecodeError, loads
 from typing import Annotated
 from uuid import UUID, uuid7
 
@@ -73,11 +73,20 @@ class InvalidRequest(Exception):
     pass
 
 
+class UTF8JSONRequest(Request):
+    """Share one UTF-8 JSON interpretation between preflight and FastAPI."""
+
+    async def json(self) -> object:
+        if not hasattr(self, "_utf8_json"):
+            self._utf8_json: object = loads((await self.body()).decode("utf-8"))
+        return self._utf8_json
+
+
 class JSONRequestRoute(APIRoute):
     """Check JSON transport and parsing before FastAPI resolves dependencies.
 
-    Request.json() caches the decoded value for the framework. Catch only input
-    decoding failures here, leaving receive errors and handler failures intact.
+    The same UTF-8 request supplies its cached JSON value to FastAPI. Catch only
+    input decoding failures here, leaving receive errors and handler failures intact.
     """
 
     def get_route_handler(self) -> Callable[[Request], Coroutine[None, None, Response]]:
@@ -85,12 +94,10 @@ class JSONRequestRoute(APIRoute):
 
         async def checked(request: Request) -> Response:
             if self.body_field is not None:
+                request = UTF8JSONRequest(request.scope, request.receive)
                 self.require_json(request)
-                body = await request.body()
+                await request.body()
                 try:
-                    # json.loads(bytes) also accepts UTF-16/32. HTTP JSON bodies
-                    # use UTF-8, so validate the encoding before Request.json().
-                    body.decode("utf-8")
                     await request.json()
                 except UnicodeDecodeError, JSONDecodeError:
                     raise InvalidRequest from None

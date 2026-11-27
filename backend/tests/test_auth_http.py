@@ -22,7 +22,7 @@ from mimir_backend.auth import (
     IssuedSession,
     Session,
 )
-from mimir_backend.auth_http import AuthHTTP
+from mimir_backend.auth_http import AuthHTTP, UTF8JSONRequest
 from mimir_backend.profile import Profiles, User
 from mimir_backend.session_guard import (
     COOKIE,
@@ -472,6 +472,12 @@ async def test_policy_errors_through_http_without_side_effects(
         "duplicate-type",
         "malformed-json",
         "invalid-utf8",
+        "utf-16-le",
+        "utf-16-be",
+        "utf-32-le",
+        "utf-32-be",
+        "utf-16",
+        "utf-32",
         "empty",
     ],
 )
@@ -507,6 +513,8 @@ async def test_json_rejections_precede_authentication(
         content = content[:-1]
     elif bad_body == "invalid-utf8":
         content = content[:-1] + b' ,"invalid":"\xff"}'
+    elif bad_body.startswith(("utf-16", "utf-32")):
+        content = json.dumps(body).encode(bad_body)
     elif bad_body == "empty":
         content = b""
     async with harness.client(ORIGIN if web else f"http://{CLI}") as client:
@@ -540,7 +548,7 @@ async def test_unrelated_http_exception_during_receive_is_preserved(
         status, detail="Receive failed", headers={"Retry-After": "3"}
     )
     async with harness.client(f"http://{CLI}") as client:
-        with patch.object(Request, method, side_effect=failure):
+        with patch.object(UTF8JSONRequest, method, side_effect=failure):
             response = await client.post(
                 "auth/login",
                 json={
@@ -569,7 +577,7 @@ async def test_genuine_server_failure_is_preserved(harness, source):
             response = await client.post("auth/login", json=body)
         else:
             with patch.object(
-                Request, source, side_effect=RuntimeError("Receive failure")
+                UTF8JSONRequest, source, side_effect=RuntimeError("Receive failure")
             ):
                 response = await client.post("auth/login", json=body)
     assert response.status_code == 500
@@ -598,7 +606,52 @@ async def test_receive_and_service_decoding_failures_are_not_request_errors(
             harness.auth.login.side_effect = error
             response = await client.post("auth/login", json=body)
         else:
-            with patch.object(Request, "body", side_effect=error):
+            with patch.object(UTF8JSONRequest, "body", side_effect=error):
                 response = await client.post("auth/login", json=body)
     assert response.status_code == 500
     assert response.text == "Internal Server Error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["auth/login", "users/me"])
+@pytest.mark.parametrize("client_type", list(ClientType))
+async def test_utf8_text_reaches_the_handler_unchanged(
+    harness, validate, endpoint, client_type
+):
+    web = client_type == ClientType.WEB
+    headers = (
+        {**BROWSER, "Content-Type": "application/json"}
+        if web
+        else {"Content-Type": "application/json"}
+    )
+    token = harness.issue("", "", client_type).token
+    if web:
+        headers["Cookie"] = f"{COOKIE}={token}"
+    elif endpoint == "users/me":
+        headers["Authorization"] = f"Bearer {token}"
+    value = "é 世界 😀 " + token_urlsafe(32)
+    body = (
+        {"username": "sample", "password": value, "client_type": client_type}
+        if endpoint == "auth/login"
+        else {"display_name": value}
+    )
+    async with harness.client(ORIGIN if web else f"http://{CLI}") as client:
+        response = await client.request(
+            "POST" if endpoint == "auth/login" else "PATCH",
+            endpoint,
+            content=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+            headers=headers,
+        )
+    if endpoint == "auth/login":
+        assert response.status_code == 201
+        validate("WebLoginResponse" if web else "CliLoginResponse", response.json())
+        harness.auth.login.assert_awaited_once_with("sample", value, client_type)
+        harness.auth.authenticate.assert_not_awaited()
+        harness.profiles.current.assert_not_awaited()
+    else:
+        assert response.status_code == 200
+        validate("User", response.json())
+        harness.auth.authenticate.assert_awaited_once_with(token, client_type)
+        assert harness.profiles.current.await_count == 1
+        assert harness.profiles.current.await_args.args[1].display_name == value
+        harness.auth.login.assert_not_awaited()

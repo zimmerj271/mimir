@@ -4758,11 +4758,39 @@ async def test_t09_http_real_roles_renewal_profile_logout(tmp_path):
                 for response in rejected:
                     assert response.status_code == 403
                     assert response.json()["error"]["code"] == "forbidden"
-                for content, media_type in [
+                rejected_bodies = [
                     (b'{"display_name":"wrong"}', "application/problem+json"),
                     (b'{"display_name":"wrong"', "application/json"),
                     (b'{"display_name":"wrong\xff"}', "application/json"),
-                ]:
+                ]
+                for encoding in (
+                    "utf-16-le",
+                    "utf-16-be",
+                    "utf-32-le",
+                    "utf-32-be",
+                    "utf-16",
+                    "utf-32",
+                ):
+                    rejected_bodies.append(
+                        (
+                            json.dumps({"display_name": "wrong"}).encode(encoding),
+                            "application/json",
+                        )
+                    )
+                    for client, kind, headers in [
+                        (cli, "cli", {}),
+                        (web, "web", browser),
+                    ]:
+                        response = await client.post(
+                            "auth/login",
+                            content=json.dumps({**login, "client_type": kind}).encode(
+                                encoding
+                            ),
+                            headers={**headers, "Content-Type": "application/json"},
+                        )
+                        assert response.status_code == 422
+                        assert response.json()["error"]["code"] == "invalid_request"
+                for content, media_type in rejected_bodies:
                     for client, headers in [(cli, bearer), (web, browser)]:
                         response = await client.patch(
                             "users/me",
@@ -4779,10 +4807,12 @@ async def test_t09_http_real_roles_renewal_profile_logout(tmp_path):
                     == "t"
                 )
 
-                profile["display_name"] = "updated"
+                profile["display_name"] = "updated é 世界 😀"
                 assert (
                     await web.patch(
-                        "users/me", json={"display_name": "updated"}, headers=browser
+                        "users/me",
+                        json={"display_name": profile["display_name"]},
+                        headers=browser,
                     )
                 ).json() == profile
                 assert (

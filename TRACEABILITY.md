@@ -23,22 +23,32 @@ submitted remediation commit and renewed review disposition are recorded in
 
 | requirement ID | normative source | implementation owner task | automated test path | fake/integration/e2e | status | last verified commit | evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `API-01` | backend/ACCEPTANCE_TESTS.md | T09/T20 | backend/tests/test_auth_http.py; tests/contracts/test_contracts.py | ASGI with fake services; contract agreement | T09 HTTP/error cases implemented; cumulative API verification pending | Remediation head recorded in PR #12 | Canonical login/session/User/Error producer schemas; actual policy and parser rejection responses; media-type/parsing checks before principal resolution; unrelated HTTP/server failure preservation |
+| `API-01` | backend/ACCEPTANCE_TESTS.md | T09/T20 | backend/tests/test_auth_http.py; tests/contracts/test_contracts.py | ASGI with fake services; contract agreement | T09 HTTP/error cases implemented; cumulative API verification pending | Remediation head recorded in PR #12 | Canonical login/session/User/Error producer schemas; actual policy and parser rejection responses; strict UTF-8 parsing shared with FastAPI before principal resolution; unrelated HTTP/server failure preservation |
 | `SEC-01` | backend/ACCEPTANCE_TESTS.md | T08/T35/T40 | backend/tests/test_auth_http.py; backend/tests/test_auth.py; tests/integration/test_database.py | ASGI with fake services; real PostgreSQL | T09 transport/security contribution implemented; broader security verification pending | Remediation head recorded in PR #12 | Exclusive credentials, stored transport binding before renewal, cookie attributes, Origin/CSRF/Host/HTTPS enforcement, redaction and side-effect denial |
 | `API-SESSION-01` | docs/acceptance/REQUIREMENTS.md | T08/T24 | backend/tests/test_auth.py; tests/integration/test_database.py | Deterministic service tests; real PostgreSQL HTTP | T09 integration contribution implemented; cumulative T24 verification pending | Remediation head recorded in PR #12 | test_transport_mismatch_cannot_slide_idle_expiry and test_t09_http_real_roles_renewal_profile_logout cover renewal, metadata-only inspection and logout |
 | `AUTH-RENEW-01` | backend/ACCEPTANCE_TESTS.md | T24/CLI-04 | tests/integration/test_database.py; backend/tests/test_auth_http.py | Real PostgreSQL HTTP; ASGI with fake services | T09 HTTP contribution implemented; CLI/cumulative verification pending | Remediation head recorded in PR #12 | Concurrent HTTP reuse resolves the same owner; rejected media/parsing/security PATCH requests preserve stored last_used_at, expires_at, revoked_at and profile values |
 | `DB-ROLE-01` | docs/acceptance/REQUIREMENTS.md | T03/T40 | tests/integration/test_database.py | Real PostgreSQL 18/Flyway | T09 V007/profile contribution implemented; cumulative audit pending | Remediation head recorded in PR #12 | test_t09_upgrade_profile_lookup_and_rollback checks cross-owner and direct identity-table denial, role grants and row_security=off failure; HTTP test uses actual auth/API roles |
 | `DB-MIG-01` | docs/acceptance/REQUIREMENTS.md | T07/T40 | tests/integration/test_database.py | Real PostgreSQL 18/Flyway | T09 additive migration contribution implemented; cumulative audit pending | Remediation head recorded in PR #12 | Fresh V001–V007 plus V006 upgrade, injected V007 failure/rollback and successful recovery/validate; applied V001–V006 files preserved |
 
-Agent-executed verification on Linux with CPython 3.14.7 and uv 0.13.4 passes
-`make backend-check` (196 tests, Ruff format/lint, strict mypy and locked sync),
-`make check` (10 governance and 37 contract tests), `make database-check`
-(241 PostgreSQL/Flyway tests) and `make deployment-check` (9 tests). The final
-receive-error boundary also passes the two targeted `test_t09_*` database tests
-via `uv run --locked pytest -c pyproject.toml ../tests/integration/test_database.py
--k t09 -q --no-cov` from `backend/`. The 89-test ASGI file includes the retained
-direct policy tests. Literal outcomes, durations and the exact submitted SHA
-are recorded in PR #12. These checks supply scoped T09 evidence.
+R1/R2 verification at `fb8e5cbf5bea9a83efdd055eeba91446436ac216` passed
+`make backend-check` (196 tests), `make check` (10 governance and 37 contract
+tests), `make database-check` (241 tests) and `make deployment-check` (9 tests).
+
+The T09-R3 correction verifies JSON syntax using decoded UTF-8 text and supplies
+the same cached parsed value to FastAPI. The 117-test HTTP file covers BOM-less
+UTF-16LE/BE and UTF-32LE/BE, BOM-prefixed UTF-16/32, both login clients and both
+PATCH credential transports. Rejections require canonical 422/no-store errors,
+redaction and no auth/profile side effects. Valid UTF-8 controls verify that
+non-ASCII values reach the handlers unchanged. Real PostgreSQL HTTP checks also
+verify that rejected encoded login/PATCH requests preserve persisted sessions
+and profiles, followed by a successful non-ASCII profile update.
+
+Agent-executed R3 validation on Linux, CPython 3.14.7 and uv 0.13.4 passes
+`make backend-check` (224 tests, locked sync, Ruff and strict mypy) and the two
+T09 database tests via `uv run --locked pytest -c pyproject.toml
+../tests/integration/test_database.py -k t09 -q --no-cov` from `backend/`.
+Current contract/governance and exact-head CI outcomes, commands, durations and
+the submitted SHA are recorded in PR #12. These checks supply scoped T09 evidence.
 
 Native macOS service execution, external browser TLS/server operation, generated
 OpenAPI/Go consumer compatibility, future resource/SSE handlers and complete
