@@ -1,0 +1,27 @@
+[
+  {
+    "name": "__Host-mimir_session",
+    "http_only": true,
+    "secure": true,
+    "same_site": "Strict",
+    "path": "/",
+    "transport": "https",
+    "json_credential_absent": true,
+    "cache_control": "no-store",
+    "phase": "login",
+    "max_age": 3600,
+    "remaining_absolute_seconds": 7200
+  },
+  {
+    "name": "__Host-mimir_session",
+    "http_only": true,
+    "secure": true,
+    "same_site": "Strict",
+    "path": "/",
+    "transport": "https",
+    "json_credential_absent": true,
+    "cache_control": "no-store",
+    "phase": "logout",
+    "max_age": 0
+  }
+]

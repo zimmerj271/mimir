@@ -3,13 +3,13 @@ PYTHON ?= python3
 .PHONY: help check governance-check test lint backend-check cli-check contract-check compose-config deployment-check database-config database-migrate database-validate database-check
 
 help:
-	@echo 'check              Offline S00 governance, hygiene and fault-path tests'
+	@echo 'check              Offline governance, hygiene, contract and fault-path tests'
 	@echo 'governance-check   Task graph, local Markdown links and acceptance registry'
 	@echo 'test               Root governance tests (no application tests implied)'
 	@echo 'lint               Tracked-file whitespace and sensitive-file checks'
 	@echo 'backend-check      Backend quality gates after T01'
 	@echo 'cli-check          CLI quality gates after CLI-01'
-	@echo 'contract-check     Contract validation after S01'
+	@echo 'contract-check     Offline candidate schemas, fixtures, protocols and checksums'
 	@echo 'compose-config     Validate operator Compose topology and protected secret files'
 	@echo 'deployment-check   Real-engine T02 tests in a unique disposable test stack'
 	@echo 'database-config    Validate migration isolation and protected credentials'
@@ -17,7 +17,7 @@ help:
 	@echo 'database-validate  Read-only Flyway checksum validation'
 	@echo 'database-check     Real PostgreSQL 18/Flyway privilege and recovery tests'
 
-check: governance-check lint test
+check: governance-check lint test contract-check
 
 governance-check:
 	$(PYTHON) scripts/check_governance.py
@@ -34,9 +34,9 @@ backend-check:
 	@test -f backend/pyproject.toml -a -f backend/uv.lock || { echo 'NOT IMPLEMENTED: T01 owns the backend toolchain'; exit 1; }
 	cd backend && uv sync --locked --all-groups
 	cd backend && uv lock --check
-	cd backend && uv run --locked ruff format --config pyproject.toml --check . ../deployment/validate_compose.py ../tests/integration/test_compose.py ../deployment/migrate.py ../tests/integration/test_database.py
-	cd backend && uv run --locked ruff check --config pyproject.toml . ../deployment/validate_compose.py ../tests/integration/test_compose.py ../deployment/migrate.py ../tests/integration/test_database.py
-	cd backend && uv run --locked mypy src ../deployment/validate_compose.py ../deployment/migrate.py
+	cd backend && uv run --locked ruff format --config pyproject.toml --check . ../deployment/validate_compose.py ../tests/integration/test_compose.py ../deployment/migrate.py ../tests/integration/test_database.py ../scripts/check_contracts.py ../scripts/contract_protocols.py ../scripts/update_contract_manifest.py ../tests/contracts
+	cd backend && uv run --locked ruff check --config pyproject.toml . ../deployment/validate_compose.py ../tests/integration/test_compose.py ../deployment/migrate.py ../tests/integration/test_database.py ../scripts/check_contracts.py ../scripts/contract_protocols.py ../scripts/update_contract_manifest.py ../tests/contracts
+	cd backend && uv run --locked mypy src ../deployment/validate_compose.py ../deployment/migrate.py ../scripts/check_contracts.py ../scripts/contract_protocols.py ../scripts/update_contract_manifest.py
 	cd backend && uv run --locked pytest -q
 
 compose-config:
@@ -68,5 +68,5 @@ cli-check:
 	git diff --exit-code -- cli/go.mod cli/go.sum
 
 contract-check:
-	@echo 'NOT IMPLEMENTED: S01 must validate and freeze contracts and own this target'
-	@exit 1
+	cd backend && uv run --offline --locked python ../scripts/check_contracts.py
+	cd backend && uv run --offline --locked python -m unittest discover -s ../tests/contracts -v

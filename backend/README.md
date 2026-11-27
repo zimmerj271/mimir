@@ -100,8 +100,9 @@ Prerequisite S00 merged as `b5824cb12cdf70443634c0df7a183951f933cf03`; T01 branc
 from that SHA. The canonical task graph governs prerequisites where older task
 brief prose says "None". The approved design revision is FINAL_V1.md at that base.
 
-Use **uv 0.12.10** and **CPython 3.14.7**, pinned by `tool.uv.required-version`,
-`.python-version` and CI. `requires-python` restricts this initial toolchain to
+Use local **uv >=0.13.4,<0.14.0** and **CPython 3.14.7**. The local uv range is
+validated by `tool.uv.required-version`; CI and the digest-pinned container use
+exactly **uv 0.13.9**. `.python-version` and CI pin the Python interpreter. `requires-python` restricts this initial toolchain to
 Python 3.14. Interpreter compatibility with future provider dependencies remains
 the responsibility of their assigned tasks, not a T01 support claim.
 
@@ -183,3 +184,14 @@ The canonical Python backend API serves both a Go/Bubble Tea CLI (first) and Typ
 
 ## Independent flow
 This folder contains the **backend build only**, with its original v1.2 architecture, documents, 41 tasks, and candidate SQL updated for newly approved CLI-facing backend requirements. The Go CLI/TUI is designed and planned separately in `../cli/`. Do not treat T20–T28 as Go tasks.
+
+
+## S01 contract tooling and owner-approved uv upgrade
+
+S01 permits local uv >=0.13.4,<0.14.0 and pins CI/container uv to 0.13.9, preserving Python 3.14.7 and
+existing runtime dependencies. The independent build backend remains exactly
+uv_build 0.12.10 unless compatibility requires a separately evidenced change;
+its version need not match the uv CLI. Development-only contract tooling is
+openapi-spec-validator 0.7.2, jsonschema 4.26.0 and PyYAML 6.0.4, with locked
+compatible transitives. No contract tool enters production runtime dependencies.
+See [contract validation](../contracts/README.md) and [S01 evidence](../docs/verification/S01.md).

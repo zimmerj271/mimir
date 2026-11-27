@@ -1,0 +1,121 @@
+[
+  {
+    "name": "initial",
+    "inherited": [
+      "r1",
+      "r2",
+      "r3"
+    ],
+    "local": [
+      "r4",
+      "r5"
+    ],
+    "limit": 2,
+    "expected": [
+      {
+        "ordinal": 4,
+        "revision_id": "r4"
+      },
+      {
+        "ordinal": 5,
+        "revision_id": "r5"
+      }
+    ]
+  },
+  {
+    "name": "cross-branch-page",
+    "inherited": [
+      "r1",
+      "r2",
+      "r3"
+    ],
+    "local": [
+      "r4",
+      "r5"
+    ],
+    "limit": 2,
+    "expected": [
+      {
+        "ordinal": 3,
+        "revision_id": "r3"
+      },
+      {
+        "ordinal": 4,
+        "revision_id": "r4"
+      }
+    ],
+    "boundary": 5
+  },
+  {
+    "name": "oldest-page",
+    "inherited": [
+      "r1",
+      "r2",
+      "r3"
+    ],
+    "local": [
+      "r4",
+      "r5"
+    ],
+    "limit": 2,
+    "expected": [
+      {
+        "ordinal": 1,
+        "revision_id": "r1"
+      },
+      {
+        "ordinal": 2,
+        "revision_id": "r2"
+      }
+    ],
+    "boundary": 3
+  },
+  {
+    "name": "after-append",
+    "inherited": [
+      "r1",
+      "r2",
+      "r3"
+    ],
+    "local": [
+      "r4",
+      "r5",
+      "r6",
+      "r7"
+    ],
+    "limit": 2,
+    "expected": [
+      {
+        "ordinal": 3,
+        "revision_id": "r3"
+      },
+      {
+        "ordinal": 4,
+        "revision_id": "r4"
+      }
+    ],
+    "boundary": 5
+  },
+  {
+    "name": "exhausted",
+    "inherited": [
+      "r1",
+      "r2",
+      "r3"
+    ],
+    "local": [
+      "r4",
+      "r5"
+    ],
+    "limit": 2,
+    "expected": [],
+    "boundary": 1
+  },
+  {
+    "name": "empty",
+    "inherited": [],
+    "local": [],
+    "limit": 100,
+    "expected": []
+  }
+]

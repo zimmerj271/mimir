@@ -167,11 +167,11 @@ Approved interaction intentions:
 - `/theme` previews highlighted palettes live, Enter persists, Esc restores the original palette. Full-screen selectors temporarily occupy the principal viewport rather than creating OS-style modal windows.
 - Launch defaults to the backend's latest active accessible conversation, defined consistently by backend ordering. If a run is in progress, discover and reattach to its durable state.
 
-The backend must define the authoritative 'latest active' sort semantics; the client must not approximate this with local file timestamps.
+S01-PAGE defines latest active as the first owned, authorized, unfenced active conversation in (updated_at DESC, conversation_id DESC) order, including one with a nonterminal run. Traverse existing conversation pages as necessary; no new filter or endpoint. If none exists, retain the deliberate creation workflow. Never approximate this with local timestamps or cached activity. See [HTTP semantics](../contracts/HTTP_SEMANTICS.md).
 
 ## 9. History pagination, rendering, and scroll anchoring
 
-On open, load approximately 30–40 most recent **canonical messages**. Older pages are fetched on upward scroll using opaque backend cursors; prefetch approximately one viewport above the loaded boundary. Suppress duplicate in-flight requests. Retain fetched canonical message pages during the session (v1 no message-page eviction). A branch's inherited messages are presented as the backend-materialized ordered visible path.
+The backend initially selects the newest canonical messages and returns each page ascending by flattened V004 visible ordinal. next_cursor retrieves the preceding older page using an exclusive upper ordinal boundary. Appends and conversation_version advancement alone do not invalidate that boundary. See S01-PAGE for cursor scope and mutable-list concurrency limits. On open, load approximately 30–40 most recent **canonical messages**. Older pages are fetched on upward scroll using opaque backend cursors; prefetch approximately one viewport above the loaded boundary. Suppress duplicate in-flight requests. Retain fetched canonical message pages during the session (v1 no message-page eviction). A branch's inherited messages are presented as the backend-materialized ordered visible path.
 
 **Windowed rendering:** format only an adaptive sliding window targeting roughly 200 terminal lines, rather than rendering the full fetched conversation on every frame. Implement a history store, a window manager/viewport adapter, and a Markdown renderer as separable components. One exceptionally long message may be rendered once and sliced into the visible line range, with specialized measurement/profiling if this proves expensive. A 200-line window is a **performance target, not a fixed correctness cap**.
 
@@ -291,3 +291,16 @@ These follow-ups are bounded engineering specifications; none justifies silently
 
 ## V1 resolution and review authority
 The selected v1 behavior baseline is `CONTRACT_DECISIONS_V1.md`, with lifecycle rules in `STATE_MACHINES.md`, context format in `PROMPT_AND_MEMORY_CONTRACT.md`, and wire schemas in `contracts/`. Older wording describing G01–G15 as unanswered or suggesting T20 may choose public payload shapes is superseded. Every feature PR must pass the **mandatory stop / independent-agent + human review** in `PR_REVIEW_TEMPLATE.md`; no subsequent branch work before authorized merge and reassignment.
+
+## S01-DISCOVERY launch and reattachment
+
+After latest-active listing traversal or explicit selection, consume
+ConversationDetail from conversation GET. Its required active_run_id is nullable;
+null loads history normally, while a UUID supplies the existing Run GET and then
+SSE attachment path. Never derive IDs from messages/timestamps/cached submissions.
+A completion between any two reads is normal: inspect authoritative state,
+accept a terminal initial SSE snapshot and reconcile canonical history. Never
+invent cancellation or automatically submit another prompt. Ambiguous submission
+operation/idempotency recovery remains separate. CLI-03 owns typed consumption,
+CLI-10 selection, CLI-11 history, CLI-14 streaming and CLI-15 startup/resume and
+recovery; see [the full contract](../contracts/HTTP_SEMANTICS.md).

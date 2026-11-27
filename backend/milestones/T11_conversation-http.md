@@ -39,3 +39,9 @@ Apply repository `AGENTS.md` and language `CODING_STANDARDS.md`. Before writing 
 At completion, **STOP**. Open one task-scoped PR using the root `PR_REVIEW_TEMPLATE.md`. Require successful documented checks, independent coding-agent review, explicit human review and affirmative merge approval. Do not merge autonomously or begin the next task before merge confirmation and a fresh human assignment. See `AGENTS.md` and `QUALITY_GATES.md`.
 
 **V1 normative references:** `CONTRACT_DECISIONS_V1.md`, `STATE_MACHINES.md`, `PROMPT_AND_MEMORY_CONTRACT.md`, `contracts/openapi.yaml`, `contracts/sse.schema.json`, and `contracts/errors.json` at unified-package root. These are consumed from the one shared `/contracts` directory in the monorepo; without separate copies.
+
+## Owner-approved S01-DISCOVERY obligation
+
+Expose GET conversation as strict ConversationDetail, with required nullable UUID active_run_id from the T10 snapshot/lookup boundary. Keep list/create/patch/branch Conversation summaries unchanged. Inaccessible/nonexistent/fenced/foreign conversations return typed 404 without run disclosure; null is not an authorization/dependency fallback. Test real HTTP plus PostgreSQL/RLS/fence/snapshot behavior and completion races. T07 is already merged into canonical main and V005 is available to T10/T11. T07 is not an ancestor of T11 in the current canonical task dependency graph; availability does not establish a graph dependency. This correction does not modify the graph or add a migration.
+
+See the single canonical [S01-DISCOVERY decision](../../contracts/HTTP_SEMANTICS.md). This adds downstream acceptance obligations only; no runtime implementation or test success is claimed by S01.

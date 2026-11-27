@@ -1,0 +1,188 @@
+[
+  {
+    "name": "valid-changing-page-size-or-version",
+    "scope": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending"
+    },
+    "cursor": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending",
+      "boundary": 5,
+      "format_version": 1,
+      "integrity_valid": true,
+      "page_size": 1,
+      "conversation_version": 999
+    },
+    "valid": true
+  },
+  {
+    "name": "tampered",
+    "scope": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending"
+    },
+    "cursor": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending",
+      "boundary": 5,
+      "format_version": 1,
+      "integrity_valid": false
+    },
+    "valid": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
+  },
+  {
+    "name": "unsupported",
+    "scope": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending"
+    },
+    "cursor": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending",
+      "boundary": 5,
+      "format_version": 2,
+      "integrity_valid": true
+    },
+    "valid": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
+  },
+  {
+    "name": "foreign-owner",
+    "scope": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending"
+    },
+    "cursor": {
+      "owner": "owner-b",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending",
+      "boundary": 5,
+      "format_version": 1,
+      "integrity_valid": true
+    },
+    "valid": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
+  },
+  {
+    "name": "wrong-parent",
+    "scope": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending"
+    },
+    "cursor": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-b",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending",
+      "boundary": 5,
+      "format_version": 1,
+      "integrity_valid": true
+    },
+    "valid": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
+  },
+  {
+    "name": "wrong-resource",
+    "scope": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending"
+    },
+    "cursor": {
+      "owner": "owner-a",
+      "resource": "projects",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending",
+      "boundary": 5,
+      "format_version": 1,
+      "integrity_valid": true
+    },
+    "valid": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
+  },
+  {
+    "name": "wrong-filter",
+    "scope": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending"
+    },
+    "cursor": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {
+        "unsupported": true
+      },
+      "ordering": "visible_ordinal_ascending",
+      "boundary": 5,
+      "format_version": 1,
+      "integrity_valid": true
+    },
+    "valid": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
+  },
+  {
+    "name": "wrong-order",
+    "scope": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "visible_ordinal_ascending"
+    },
+    "cursor": {
+      "owner": "owner-a",
+      "resource": "messages",
+      "parent": "conversation-a",
+      "filters": {},
+      "ordering": "other",
+      "boundary": 5,
+      "format_version": 1,
+      "integrity_valid": true
+    },
+    "valid": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
+  }
+]

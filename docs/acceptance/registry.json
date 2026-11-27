@@ -1002,6 +1002,72 @@
       "tests": [
         "tests/integration/test_database.py"
       ]
+    },
+    "S01": {
+      "specification": "docs/governance/tasks/S01_shared-contract-foundation.md",
+      "requirements": [
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "GOV-02"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "API-SESSION-01"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "SSE-01"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "LIFECYCLE-02"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "CLI-REC-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "API-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "SEC-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "CONTRACT-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "OP-LOOKUP-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "OP-LOOKUP-02"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "INF-02"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "SSE-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "SSE-02"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "SSE-STAND-01"
+        }
+      ],
+      "tests": [
+        "tests/contracts/test_contracts.py",
+        "tests/contracts/test_remediation.py"
+      ],
+      "evidence": "docs/verification/S01_SECOND_REMEDIATION.md; new R4 lifecycle regression/audit and R5 dependency-prose correction; R1\u2013R3 preserved. Runtime conformance, renewed review, human approval and external owner dispositions remain pending."
     }
   }
 }

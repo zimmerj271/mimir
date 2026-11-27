@@ -1,0 +1,28 @@
+❯ make backend-check
+cd backend && uv sync --locked --all-groups
+Resolved 45 packages in 1ms
+Checked 43 packages in 0.51ms
+cd backend && uv lock --check
+Resolved 45 packages in 1ms
+cd backend && uv run --locked ruff format --config pyproject.toml --check . ../deployment/validate_compose.py ../tests/integration/test_compose.py ../deployment/migrate.py ../tests/integration/test_database.py ../scripts/check_contracts.py ../scripts/contract_protocols.py ../scripts/update_contract_manifest.py ../tests/contracts
+18 files already formatted
+cd backend && uv run --locked ruff check --config pyproject.toml . ../deployment/validate_compose.py ../tests/integration/test_compose.py ../deployment/migrate.py ../tests/integration/test_database.py ../scripts/check_contracts.py ../scripts/contract_protocols.py ../scripts/update_contract_manifest.py ../tests/contracts
+All checks passed!
+cd backend && uv run --locked mypy src ../deployment/validate_compose.py ../deployment/migrate.py ../scripts/check_contracts.py ../scripts/contract_protocols.py ../scripts/update_contract_manifest.py
+Success: no issues found in 9 source files
+cd backend && uv run --locked pytest -q
+..................................................... [ 50%]
+....................................................  [100%]
+====================== tests coverage =======================
+______ coverage: platform linux, python 3.14.7-final-0 ______
+
+Name                                 Stmts   Miss Branch BrPart  Cover   Missing
+--------------------------------------------------------------------------------
+src/mimir_backend/__init__.py            0      0      0      0   100%
+src/mimir_backend/auth.py              151      3     32      1    98%   81, 161-162, 164->166
+src/mimir_backend/auth_postgres.py      77     30     18      0    56%   50-52, 55-61, 84-95, 109, 112-117, 125, 135, 149, 157-163, 178, 191-196
+src/mimir_backend/provision.py          74     11     12      3    81%   88-97, 106-107, 115, 119
+--------------------------------------------------------------------------------
+TOTAL                                  302     44     62      4    83%
+Coverage XML written to file coverage.xml
+105 passed in 6.57s

@@ -81,6 +81,14 @@ authorized contract governance; T05 does not alter protected contract artifacts.
 - Optimistic conversation version checks, explicit `Idempotency-Key` on create/submit/branch/regenerate operations, tenant-scoped error responses, opaque cursor pagination, ownership checks for all GET/SSE/POST operations.
 - In-process event bus is replaceable and supports multiple subscribers, but does not own durable state. REST remains authoritative for run state, even after event loss.
 
+The owner-approved S01-AUTH/S01-CANCEL/S01-PAGE rules in
+[HTTP semantics](../contracts/HTTP_SEMANTICS.md) bind credential transport, browser
+HTTPS/CSRF/origin/host controls, cancellation status/body snapshots, and deterministic
+keyset ordering. Canonical archive mutations alone advance conversation updated_at;
+reads/provisional/runtime-only activity do not. Latest active uses existing listing
+pages, and V004 visible ordinals support stable older-history traversal under append.
+No runtime implementation or database migration is part of S01.
+
 ## 8. Runtime
 - Durable `runtime.jobs` queue with PostgreSQL `FOR UPDATE SKIP LOCKED`, leases, lease tokens and bounded retry scheduling; run executor separate from generic background jobs. Only short DB transactions; no DB transactions around inference or Mem0 calls.
 - Known transient failure retries with capped exponential backoff/jitter; permanent failure terminal; ambiguous Mem0 ingestion outcome enters explicit reconciliation state or manual intervention. Lost worker lease cannot authorize stale completion; acknowledge that provider side effects may already have happened.
@@ -130,3 +138,13 @@ These ideas **are not v1 requirements**. All additional future work must be reco
 
 ## V1 resolution and review authority
 The selected v1 behavior baseline is `CONTRACT_DECISIONS_V1.md`, with lifecycle rules in `STATE_MACHINES.md`, context format in `PROMPT_AND_MEMORY_CONTRACT.md`, and wire schemas in `contracts/`. Older wording describing G01–G15 as unanswered or suggesting T20 may choose public payload shapes is superseded. Every feature PR must pass the **mandatory stop / independent-agent + human review** in `PR_REVIEW_TEMPLATE.md`; no subsequent branch work before authorized merge and reassignment.
+
+## S01-DISCOVERY derived projection
+
+T10's owner-scoped conversation repository/service boundary supplies a consistent
+metadata/runtime read snapshot; T11 exposes the approved ConversationDetail with
+required nullable active_run_id. Use existing V005 model_runs/active-conversation
+partial uniqueness, owner scope/RLS/visibility/deletion fences; no additional
+canonical state, migration, version increment or activity timestamp update.
+T20/T28 verify actual schema and client conformance. S01 supplies contract-only
+agreement scenarios; see [HTTP semantics](../contracts/HTTP_SEMANTICS.md).

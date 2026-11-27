@@ -16,7 +16,10 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "jsonschema==4.26.0",
     "mypy==2.4.0",
+    "openapi-spec-validator==0.7.2",
+    "pyyaml==6.0.4",
     "ruff==0.17.1",
     "uv-build==0.12.10",
 ]
@@ -27,7 +30,7 @@ test = [
 ]
 
 [tool.uv]
-required-version = "==0.12.10"
+required-version = ">=0.13.4,<0.14.0"
 default-groups = ["dev", "test"]
 
 [tool.ruff]

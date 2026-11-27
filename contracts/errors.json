@@ -17,6 +17,7 @@
     "payload_too_large": 413,
     "rate_limited": 429,
     "dependency_unavailable": 503,
-    "backend_timeout": 504
+    "backend_timeout": 504,
+    "ambiguous_credentials": 400
   }
 }

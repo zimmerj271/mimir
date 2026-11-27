@@ -32,8 +32,9 @@ jobs:
           python-version: '3.14.7'
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
-          version: '0.12.10'
+          version: '0.13.9'
           enable-cache: false
+      - run: cd backend && uv sync --locked --all-groups
       - run: make check
       - run: make backend-check
       - uses: docker/setup-compose-action@54042514f505b273907334ae2b9cdbb9a0213c1a # v2
@@ -53,7 +54,7 @@ jobs:
         run: |
           echo 'Backend package/toolchain gates executed; application behavior remains unimplemented'
           echo 'CLI builds, race and PTY tests: NOT IMPLEMENTED (CLI-01 and successors)'
-          echo 'Contract semantics/producer/consumer tests: NOT IMPLEMENTED (S01 and successors)'
+          echo 'S01 offline contract agreement checks executed; actual FastAPI/Go producer/consumer conformance remains T20/T28/CLI-03 work'
           echo 'T02 real container tests run on Linux; macOS runs deterministic policy tests only'
           echo 'T03 V001 migration/role tests run on Linux; domain migrations and application startup remain later tasks'
           echo 'Full installation and native macOS container runtime remain unverified'

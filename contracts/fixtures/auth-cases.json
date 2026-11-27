@@ -1,0 +1,322 @@
+[
+  {
+    "name": "cli-bearer-no-browser-headers",
+    "facts": {
+      "authorization_count": 1,
+      "stored_client_type": "cli",
+      "mutation": true
+    },
+    "allowed": true
+  },
+  {
+    "name": "web-cookie-mutation",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": "1"
+    },
+    "allowed": true
+  },
+  {
+    "name": "cookie-get-sse-no-csrf",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": false,
+      "origin": null,
+      "csrf": null
+    },
+    "allowed": true
+  },
+  {
+    "name": "web-login-replaces-expired-cookie",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": "1",
+      "login": true,
+      "client_type": "web",
+      "credential_valid": false
+    },
+    "allowed": true
+  },
+  {
+    "name": "cli-login",
+    "facts": {
+      "login": true,
+      "client_type": "cli",
+      "has_json_body": true,
+      "content_type": "application/json"
+    },
+    "allowed": true
+  },
+  {
+    "name": "both",
+    "facts": {
+      "authorization_count": 1,
+      "stored_client_type": "cli",
+      "mutation": true,
+      "cookie_count": 1
+    },
+    "allowed": false,
+    "http_status": 400,
+    "error_code": "ambiguous_credentials"
+  },
+  {
+    "name": "duplicate-authorization",
+    "facts": {
+      "authorization_count": 2,
+      "stored_client_type": "cli",
+      "mutation": true
+    },
+    "allowed": false,
+    "http_status": 400,
+    "error_code": "ambiguous_credentials"
+  },
+  {
+    "name": "duplicate-cookie",
+    "facts": {
+      "cookie_count": 2,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": "1"
+    },
+    "allowed": false,
+    "http_status": 400,
+    "error_code": "ambiguous_credentials"
+  },
+  {
+    "name": "missing",
+    "facts": {},
+    "allowed": false,
+    "http_status": 401,
+    "error_code": "unauthenticated"
+  },
+  {
+    "name": "expired",
+    "facts": {
+      "authorization_count": 1,
+      "stored_client_type": "cli",
+      "mutation": true,
+      "credential_valid": false
+    },
+    "allowed": false,
+    "http_status": 401,
+    "error_code": "unauthenticated"
+  },
+  {
+    "name": "web-token-as-bearer",
+    "facts": {
+      "authorization_count": 1,
+      "stored_client_type": "web",
+      "mutation": true
+    },
+    "allowed": false,
+    "http_status": 401,
+    "error_code": "unauthenticated"
+  },
+  {
+    "name": "cli-token-as-cookie",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "cli",
+      "https": true,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": "1"
+    },
+    "allowed": false,
+    "http_status": 401,
+    "error_code": "unauthenticated"
+  },
+  {
+    "name": "bad-origin-None",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": null,
+      "csrf": "1"
+    },
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
+  },
+  {
+    "name": "bad-origin-null",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "null",
+      "csrf": "1"
+    },
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
+  },
+  {
+    "name": "bad-origin-https://attacker.invalid",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "https://attacker.invalid",
+      "csrf": "1"
+    },
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
+  },
+  {
+    "name": "bad-origin-malformed",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "malformed",
+      "csrf": "1"
+    },
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
+  },
+  {
+    "name": "bad-csrf-None",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": null
+    },
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
+  },
+  {
+    "name": "bad-csrf-0",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": "0"
+    },
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
+  },
+  {
+    "name": "bad-csrf-2",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": "2"
+    },
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
+  },
+  {
+    "name": "insecure-cookie",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": false,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": "1"
+    },
+    "allowed": false
+  },
+  {
+    "name": "insecure-web-login",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": false,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": "1",
+      "login": true,
+      "client_type": "web"
+    },
+    "allowed": false
+  },
+  {
+    "name": "untrusted-host",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": "1",
+      "trusted_host": false
+    },
+    "allowed": false
+  },
+  {
+    "name": "foreign-origin-get",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": false,
+      "origin": "https://attacker.invalid",
+      "csrf": "1"
+    },
+    "allowed": false
+  },
+  {
+    "name": "form-body",
+    "facts": {
+      "cookie_count": 1,
+      "stored_client_type": "web",
+      "https": true,
+      "mutation": true,
+      "origin": "https://browser.invalid",
+      "csrf": "1",
+      "has_json_body": true,
+      "content_type": "application/x-www-form-urlencoded"
+    },
+    "allowed": false
+  },
+  {
+    "name": "login-authorization",
+    "facts": {
+      "login": true,
+      "client_type": "cli",
+      "authorization_count": 1
+    },
+    "allowed": false
+  },
+  {
+    "name": "cli-login-cookie",
+    "facts": {
+      "login": true,
+      "client_type": "cli",
+      "cookie_count": 1
+    },
+    "allowed": false
+  }
+]

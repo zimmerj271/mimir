@@ -70,3 +70,73 @@ rules supersede inconsistent message-state wording in earlier design inputs.
 ## Operational and implementation governance
 - Component-owned typed config, deployment-provisioned secrets, local loopback only. Structured redacted metadata-only logs; restricted health/dependency diagnostics; lightweight metrics but no required monitoring service. Graceful shutdown fences active execution and persists unresolved work.
 - Task DAG owns implementation boundaries. CLI-12 and CLI-16 split; T20–T28 conformance rather than reimplementation; standalone execution shares T16 executor. One assigned task/branch/PR, independent agent review, human authorization to merge, stop before next task; protected files and tests cannot be weakened without approval. Requirements/test traceability; fake providers in deterministic CI, real dependencies/platform checks at milestones.
+
+## Owner-approved S01 contract decision addenda
+
+The owner explicitly approved S01-AUTH, S01-CANCEL and S01-PAGE during the S01
+implementation assignment. These decisions supersede inconsistent draft wording.
+Their complete wire requirements are recorded in the canonical
+[HTTP semantics](../../contracts/HTTP_SEMANTICS.md).
+
+- **S01-AUTH:** one T08 session service/identity model; CLI-issued bearer sessions
+  and web-issued HTTPS-only `__Host-mimir_session` cookies, transport-bound by
+  stored client type. Login discriminates CLI token JSON versus web session-only
+  JSON plus secure cookie; fresh credential each login. Mutually exclusive
+  credentials, 400 `ambiguous_credentials`, 401 `unauthenticated`; browser mutations
+  require exact configured Origin and `X-Mimir-CSRF: 1`, with 403 `forbidden` on
+  failure. Trusted host, no permissive CORS, JSON bodies only, no-store session
+  responses, matching cookie expiry on logout. Existing 30d/90d lifecycle and
+  redaction remain; no refresh/JWT/OAuth/additional endpoint. Browser TLS/frontends
+  and HTTP middleware remain outside S01; TLS provisioning is outside T09 too.
+- **S01-CANCEL:** both success codes return canonical Run from one snapshot:
+  202 for durably requested cancellation while nonterminal with the flag true;
+  200 for any unchanged terminal outcome with the flag false, including immediate
+  cancellation/completion races. No separate idempotency key, terminal conflict,
+  provider wait or late terminal overwrite. Pending cancellation before worker
+  claim wins; running outcomes use the first valid terminal commit. GET resolves
+  subsequent state; SSE terminal events follow commit. Both run kinds agree.
+- **S01-PAGE:** exclusive two-column keysets: projects created_at/project_id DESC;
+  conversations updated_at/conversation_id DESC. Latest active is first owned,
+  visible, unfenced active conversation, including a nonterminal run; use existing
+  pages, no new filters/endpoints/columns. updated_at tracks committed canonical
+  creation/messages/actual metadata changes atomically and monotonically, never
+  reads/provisional/runtime-only/session/memory activity or no-op metadata.
+  Flattened V004 history initially selects newest, returns ascending visible
+  ordinals, and pages older using the smallest ordinal as exclusive boundary.
+  Appends/version advancement do not invalidate older boundaries. Opaque,
+  integrity-protected, versioned cursors bind owner/resource/parent/filters/order/
+  boundary, remain subject to authorization/RLS/fences, and need not retain a
+  boundary row. Invalid scope/tampering/format is 422 `invalid_request` on accessible
+  resources. Page-size changes are allowed; exhaustion/empty returns null cursor.
+  Mutable listings have per-page committed reads, no cross-request frozen snapshot;
+  clients may restart. Preserve 50/200 and 100/500 limits; no offset pagination,
+  mandatory cursor persistence or long-lived snapshot infrastructure.
+
+T08 inspection confirms stored client_type, common session metadata, fresh 256-bit
+issuance and hash-only 30d/90d renewal/revocation support. V003 permits monotonic
+canonical timestamp maintenance and existing API/worker update grants; V004 exposes
+flattened inherited-plus-offset-local visible ordinals. No runtime or applied SQL
+changes are authorized or made by S01. Runtime services/transactions must enforce
+the added HTTP requirements in their assigned tasks. The initial contract remains
+1.0.0 and a candidate pending independent review and explicit human approval.
+
+## Owner-approved S01 independent-review remediation
+
+**S01-DISCOVERY (R1):** The owner explicitly approved ConversationDetail on the
+existing conversation GET, with required nullable active_run_id. Summary schemas
+stay unchanged. The field derives an owner-visible, unfenced pending/running
+conversational run (including requested cancellation), from the same authoritative
+read snapshot as metadata. Null is only absence on an accessible conversation;
+404 conceals inaccessible conversation/run existence and dependency errors remain
+errors. No canonical version/timestamp mutation, persisted column, migration or
+new endpoint. Client detail → run GET → snapshot-first SSE → canonical history
+handles completion races without resubmission or inferred IDs. Full semantics and
+T10/T11/T20/T28/CLI-03/10/11/14/15 ownership are in
+[HTTP semantics](../../contracts/HTTP_SEMANTICS.md). Runtime remains deferred.
+
+**R2/R3:** The owner approved exact chronological/UUID normalization in the
+contract reference model and stronger authentication definition/header wiring and
+semantic mutation tests. S01-PAGE and S01-AUTH public behavior is unchanged.
+Contract 1.0.0 remains the initial candidate, pending renewed independent review
+and explicit human contract/merge approval. This approval authorizes remediation,
+not acceptance of findings by the independent reviewer or task completion.

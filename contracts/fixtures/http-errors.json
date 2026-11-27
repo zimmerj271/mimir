@@ -1,0 +1,189 @@
+[
+  {
+    "http_status": 401,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "unauthenticated",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 403,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "forbidden",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 404,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "not_found",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 409,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "project_not_empty",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 409,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "conversation_version_conflict",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 409,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "idempotency_key_conflict",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 409,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "active_run_conflict",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 409,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "invalid_run_transition",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 410,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "operation_expired",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 404,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "operation_unknown",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 422,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "context_budget_exceeded",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 422,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "invalid_request",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 413,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "payload_too_large",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 429,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "rate_limited",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 503,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "dependency_unavailable",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 504,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "backend_timeout",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  },
+  {
+    "http_status": 400,
+    "body": {
+      "request_id": "synthetic-request",
+      "error": {
+        "code": "ambiguous_credentials",
+        "message": "Synthetic contract error",
+        "details": {}
+      }
+    }
+  }
+]

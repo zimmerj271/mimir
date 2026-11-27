@@ -55,7 +55,7 @@ def test_fresh_locked_environment_and_repeat_sync(project: Path) -> None:
         "python",
         "-I",
         "-c",
-        "import mimir_backend, mypy, pytest, pytest_asyncio, pytest_cov; "
+        "import mimir_backend, mypy, pytest, pytest_asyncio, pytest_cov, openapi_spec_validator, jsonschema, yaml; "
         "from importlib.metadata import version; "
         "assert version('mimir-backend') == '0.1.0'",
     )
@@ -72,7 +72,7 @@ def test_locked_sync_rejects_invalid_toolchain(project: Path, fault: str) -> Non
     else:
         manifest.write_text(
             manifest.read_text().replace(
-                'required-version = "==0.12.10"', 'required-version = "==0.0.0"'
+                'required-version = ">=0.13.4,<0.14.0"', 'required-version = "==0.0.0"'
             )
         )
     result = run_uv(
@@ -96,7 +96,7 @@ def test_stale_lock_rejected_while_unlocked_control_succeeds(tmp_path: Path) -> 
     manifest.write_text(
         '[project]\nname = "mimir-lock-fixture"\nversion = "0.1.0"\n'
         'requires-python = ">=3.14,<3.15"\n'
-        '[tool.uv]\nrequired-version = "==0.12.10"\n'
+        '[tool.uv]\nrequired-version = ">=0.13.4,<0.14.0"\n'
     )
     result = run_uv(project, "lock", "--python", sys.executable)
     assert result.returncode == 0, result.stderr
@@ -194,3 +194,34 @@ def test_wheel_and_sdist_install_without_source_checkout(project: Path) -> None:
         "assert files(mimir_backend).joinpath('py.typed').is_file()",
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_s01_local_uv_range_and_exact_ci_deployment_pins() -> None:
+    import re
+    import tomllib
+
+    from packaging.specifiers import SpecifierSet
+    from packaging.version import Version
+
+    root = BACKEND.parent
+    config = tomllib.loads((BACKEND / "pyproject.toml").read_text())
+    assert config["tool"]["uv"]["required-version"] == ">=0.13.4,<0.14.0"
+    assert (BACKEND / ".python-version").read_text().strip() == "3.14.7"
+    workflow = (root / ".github/workflows/bootstrap.yml").read_text()
+    assert "version: '0.13.9'" in workflow
+    dockerfile = (root / "deployment/Dockerfile").read_text()
+    assert re.search(
+        r"^FROM ghcr\.io/astral-sh/uv:0\.13\.9@sha256:"
+        r"d3b601f0c7b118bc1753febf7c41cc80981df678445e0254284eecf84db79a7d AS uv$",
+        dockerfile,
+        re.MULTILINE,
+    )
+    result = subprocess.run(
+        ["uv", "--version"], capture_output=True, text=True, check=True, timeout=15
+    )
+    policy = SpecifierSet(config["tool"]["uv"]["required-version"])
+    assert Version(result.stdout.split()[1]) in policy
+    for compatible in ("0.13.4", "0.13.9", "0.13.10"):
+        assert Version(compatible) in policy
+    for incompatible in ("0.13.3", "0.14.0", "0.14.1"):
+        assert Version(incompatible) not in policy

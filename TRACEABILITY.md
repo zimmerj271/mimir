@@ -190,3 +190,34 @@ is `backend/milestones/T01_python-toolchain.md` at its recorded main base.
 | SSE-STAND-01 | T18/T27 | To create in task PR; NOT IMPLEMENTED |
 | CONTRACT-01 | T20/T28/CLI-03 | To create in task PR; NOT IMPLEMENTED |
 | CLI-INTEGRATION-01 | T28/CLI-16 | To create in task PR; NOT IMPLEMENTED |
+
+
+S01 contract-agreement coverage → `tests/contracts/test_contracts.py`,
+`scripts/check_contracts.py`, `scripts/contract_protocols.py`, with governed
+fixtures under `contracts/fixtures/`. GOV-02 receives OpenAPI 3.1/Draft 2020-12,
+reference, fixture/error/version, exact raw-byte checksum and completeness checks.
+Positive/negative scenarios support API-SESSION-01/API-01/SEC-01, SSE-01/SSE-02/
+SSE-STAND-01, INF-02, LIFECYCLE-02 and OP-LOOKUP-01/02/CLI-REC-01 at the contract
+level only. The registry supporting mapping preserves normative ownership and
+not-implemented runtime status. The operation/source audit is
+[recorded separately](docs/verification/S01_OPERATION_AUDIT.md), and
+[execution evidence](docs/verification/S01.md) distinguishes historical provisional
+runs from final agent locked contract/toolchain successes and verified human
+full backend validation (105 tests; agent local socket IPC is denied). T09/T20/T24/T28 and CLI-03
+must validate actual authentication/producer/consumer behavior; T10/T11/T26 and
+CLI-05/08/10/11/14/15 validate runtime pagination/selection/scrolling. T12/T16/
+T18/T19/T27 validate transactions, fences, provider cancellation and streaming.
+No fixture proves database concurrency, TLS, cursor cryptography or runtime
+conformance. Candidate 1.0.0 and human approval remain pending.
+
+S01 independent-review R1 is resolved at the contract level by owner-approved
+S01-DISCOVERY in [HTTP semantics](contracts/HTTP_SEMANTICS.md): distinct strict
+ConversationDetail with required nullable active_run_id, snapshot/visibility and
+read-only lifecycle rules, public discovery/status/SSE/history transcripts. R2
+normalizes chronological timestamp instants and UUID identities for both keyset
+operations. R3 binds authentication checks to referenced parameter/header
+definitions and tests semantic mutations after refreshing disposable checksums.
+Executable traceability: `tests/contracts/test_remediation.py`, the actual Make
+failure probes in `tests/contracts/test_contracts.py`, and governed discovery and
+listing fixtures. Runtime owners: T10/T11, conformance T20/T28 and CLI-03/10/11/14/15.
+Renewed independent review and human approval remain pending.

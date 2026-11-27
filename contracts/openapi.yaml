@@ -4,19 +4,46 @@ info:
   version: 1.0.0
   description: Normative Mimir v1 design contract for S01 executable contract freeze. No implementation or producer
     conformance implied by this artifact.
+x-mimir-decisions:
+  authentication: S01-AUTH
+  cancellation: S01-CANCEL
+  pagination: S01-PAGE
+x-mimir-authentication:
+  session_model: opaque
+  transports: {cli: bearerAuth, web: cookieAuth}
+  mutually_exclusive: true
+  stored_client_type_binding: true
+  idle_days: 30
+  absolute_days: 90
+  implicit_renewal: true
+  refresh_endpoint: false
+  csrf_header: X-Mimir-CSRF
+  csrf_value: '1'
+  browser_https_required: true
+  exact_trusted_origin: true
+  trusted_host_required: true
+  credentialed_cross_origin: false
 servers:
 - url: http://127.0.0.1:8000
 paths:
   /api/v1/auth/login:
     post:
       operationId: login
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '201':
           description: Success
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            Set-Cookie:
+              $ref: '#/components/headers/SessionCookie'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
+                oneOf:
+                - $ref: '#/components/schemas/CliLoginResponse'
+                - $ref: '#/components/schemas/WebLoginResponse'
         '400':
           description: Typed error; see error catalog
           content:
@@ -25,6 +52,11 @@ paths:
                 $ref: '#/components/schemas/Error'
         '401':
           description: Typed error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Browser origin or CSRF rejection
           content:
             application/json:
               schema: *id001
@@ -49,12 +81,18 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/LoginRequest'
+      parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
   /api/v1/auth/session:
     get:
       operationId: getSession
       responses:
         '200':
           description: Success
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
           content:
             application/json:
               schema:
@@ -86,12 +124,19 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
   /api/v1/auth/logout:
     post:
       operationId: logout
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '204':
           description: Success
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            Set-Cookie:
+              $ref: '#/components/headers/ExpiredSessionCookie'
         '400':
           description: Typed error; see error catalog
           content:
@@ -134,6 +179,10 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
+      parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
   /api/v1/users/me:
     get:
       operationId: getMe
@@ -171,8 +220,10 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
     patch:
       operationId: patchMe
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '200':
           description: Success
@@ -222,15 +273,21 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/UserPatch'
+      parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
   /api/v1/projects:
     get:
       operationId: listProjects
+      x-mimir-pagination: projects
+      description: S01-PAGE in HTTP_SEMANTICS.md defines exclusive keysets, ordering, cursor scope and concurrency.
       responses:
         '200':
           description: Success
@@ -263,8 +320,14 @@ paths:
           content:
             application/json:
               schema: *id001
+        '422':
+          description: Invalid, tampered, unsupported or scope-mismatched cursor on accessible resource
+          content:
+            application/json:
+              schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
       - name: cursor
         in: query
@@ -284,6 +347,7 @@ paths:
           default: 50
     post:
       operationId: createProject
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '201':
           description: Success
@@ -333,6 +397,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -340,6 +405,8 @@ paths:
             schema:
               $ref: '#/components/schemas/ProjectCreate'
       parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
       - &id003
         name: Idempotency-Key
         in: header
@@ -386,6 +453,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
       - &id002
         name: id
@@ -396,6 +464,7 @@ paths:
           format: uuid
     patch:
       operationId: patchProject
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '200':
           description: Success
@@ -445,6 +514,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -452,9 +522,12 @@ paths:
             schema:
               $ref: '#/components/schemas/ProjectPatch'
       parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
       - *id002
     delete:
       operationId: deleteProject
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '204':
           description: Success
@@ -500,11 +573,16 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
       - *id002
   /api/v1/conversations:
     get:
       operationId: listConversations
+      x-mimir-pagination: conversations
+      description: S01-PAGE in HTTP_SEMANTICS.md defines exclusive keysets, ordering, cursor scope and concurrency.
       responses:
         '200':
           description: Success
@@ -537,8 +615,14 @@ paths:
           content:
             application/json:
               schema: *id001
+        '422':
+          description: Invalid, tampered, unsupported or scope-mismatched cursor on accessible resource
+          content:
+            application/json:
+              schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
       - name: cursor
         in: query
@@ -558,6 +642,7 @@ paths:
           default: 50
     post:
       operationId: createConversation
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '201':
           description: Success
@@ -607,6 +692,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -614,17 +700,20 @@ paths:
             schema:
               $ref: '#/components/schemas/ConversationCreate'
       parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
       - *id003
   /api/v1/conversations/{id}:
     get:
       operationId: getConversation
+      description: "S01-DISCOVERY: metadata and required nullable active_run_id share one authoritative read snapshot; enforce owner visibility/RLS/fences before disclosure. See HTTP_SEMANTICS.md."
       responses:
         '200':
           description: Success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Conversation'
+                $ref: '#/components/schemas/ConversationDetail'
         '400':
           description: Typed error; see error catalog
           content:
@@ -652,10 +741,12 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
       - *id002
     patch:
       operationId: patchConversation
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '200':
           description: Success
@@ -705,6 +796,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -712,6 +804,8 @@ paths:
             schema:
               $ref: '#/components/schemas/ConversationPatch'
       parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
       - *id002
     delete:
       operationId: deleteConversation
@@ -764,12 +858,17 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
       - *id002
       description: 202 fences the full branch subtree asynchronously; not a synchronous 204 purge.
   /api/v1/conversations/{id}/messages:
     get:
       operationId: listMessages
+      x-mimir-pagination: messages
+      description: S01-PAGE in HTTP_SEMANTICS.md defines exclusive keysets, ordering, cursor scope and concurrency.
       responses:
         '200':
           description: Success
@@ -802,8 +901,14 @@ paths:
           content:
             application/json:
               schema: *id001
+        '422':
+          description: Invalid, tampered, unsupported or scope-mismatched cursor on accessible resource
+          content:
+            application/json:
+              schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
       - name: id
         in: path
@@ -829,6 +934,7 @@ paths:
           default: 100
     post:
       operationId: submitMessage
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '201':
           description: Success
@@ -883,6 +989,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -890,11 +997,14 @@ paths:
             schema:
               $ref: '#/components/schemas/MessageSubmit'
       parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
       - *id002
       - *id003
   /api/v1/conversations/{id}/branches:
     post:
       operationId: createBranch
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '201':
           description: Success
@@ -944,6 +1054,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -951,11 +1062,14 @@ paths:
             schema:
               $ref: '#/components/schemas/BranchCreate'
       parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
       - *id002
       - *id003
   /api/v1/runs/standalone:
     post:
       operationId: submitStandalone
+      description: "S01-AUTH: browser mutations require X-Mimir-CSRF: 1 and exact configured Origin; HTTPS-only cookie transport, no mixed credentials. See HTTP_SEMANTICS.md."
       responses:
         '201':
           description: Success
@@ -1010,6 +1124,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -1017,6 +1132,8 @@ paths:
             schema:
               $ref: '#/components/schemas/StandaloneSubmit'
       parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
       - *id003
   /api/v1/runs/{run_id}:
     get:
@@ -1055,6 +1172,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
       - &id005
         name: run_id
@@ -1071,7 +1189,7 @@ paths:
             text/event-stream:
               schema:
                 type: string
-              description: Frame types defined by sse.schema.json; SSE comments heartbeat.
+                description: Frame types defined by sse.schema.json; SSE comments heartbeat.
         '400':
           description: Typed error; see error catalog
           content:
@@ -1104,6 +1222,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
       - *id005
       description: Initial run.snapshot replaces provisional text, followed by ordered message.delta with contiguous
@@ -1112,9 +1231,16 @@ paths:
   /api/v1/runs/{run_id}/cancel:
     post:
       operationId: cancelRun
+      description: S01-CANCEL in HTTP_SEMANTICS.md; one status/body snapshot, no provider wait or separate idempotency key. Terminal is not a conflict; GET resolves subsequent state.
       responses:
         '200':
-          description: Success
+          description: Authoritative terminal snapshot unchanged; cancellation_requested false
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+        '202':
+          description: Durably accepted cancellation; nonterminal snapshot with cancellation_requested true, including repeats.
           content:
             application/json:
               schema:
@@ -1161,7 +1287,10 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
+      - $ref: '#/components/parameters/BrowserCSRF'
+      - $ref: '#/components/parameters/BrowserOrigin'
       - *id005
   /api/v1/operations/{operation_type}/{idempotency_key}:
     get:
@@ -1205,6 +1334,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
       parameters:
       - name: operation_type
         in: path
@@ -1262,6 +1392,7 @@ paths:
               schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
   /api/v1/health/live:
     get:
       operationId: healthLive
@@ -1297,8 +1428,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
+        '400':
+          description: Typed authentication/authorization error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '401':
+          description: Typed authentication/authorization error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '403':
+          description: Typed authentication/authorization error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '404':
+          description: Typed authentication/authorization error; see error catalog
+          content:
+            application/json:
+              schema: *id001
+        '503':
+          description: Typed authentication/authorization error; see error catalog
+          content:
+            application/json:
+              schema: *id001
       security:
       - bearerAuth: []
+      - cookieAuth: []
   /api/v1/meta:
     get:
       operationId: getApiMetadata
@@ -1323,6 +1480,46 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: __Host-mimir_session
+      description: HTTPS-only web-issued session; mutually exclusive with bearer. See S01-AUTH in HTTP_SEMANTICS.md.
+  parameters:
+    BrowserCSRF:
+      name: X-Mimir-CSRF
+      in: header
+      required: false
+      description: Required with exact configured Origin for browser mutations including web login/logout. CLI bearer needs no CSRF. Failure is 403 forbidden. Conditional requirement cannot be enforced by security alternatives.
+      x-mimir-browser-requirement: {"clients": ["web"], "mutations": "required", "authenticated_get": "not_required", "cli": "not_required"}
+      schema:
+        type: string
+        const: '1'
+    BrowserOrigin:
+      name: Origin
+      in: header
+      required: false
+      description: Browser mutations require exact configured trusted origin; reject missing/null/malformed/unauthorized. Authenticated GET rejects unauthorized Origin if present. Host/forwarded headers do not establish trust.
+      x-mimir-browser-requirement: {"clients": ["web"], "mutations": "exact_configured_origin_required", "authenticated_get": "reject_unauthorized_if_present", "trust_from_host_or_forwarded": false}
+      schema:
+        type: string
+  headers:
+    NoStore:
+      description: Credential/private session metadata responses are never cacheable.
+      required: true
+      schema:
+        type: string
+        const: no-store
+    SessionCookie:
+      description: Web login only; required for web, absent for CLI. __Host-mimir_session with HttpOnly; Secure; SameSite=Strict; Path=/; no Domain; Max-Age bounded by remaining absolute lifetime. Never include cookie values in examples.
+      x-mimir-cookie: {"name": "__Host-mimir_session", "http_only": true, "secure": true, "same_site": "Strict", "path": "/", "domain": null, "required_for": "web", "forbidden_for": "cli", "transport": "https", "max_age": "positive_bounded_by_remaining_absolute_seconds"}
+      schema:
+        type: string
+    ExpiredSessionCookie:
+      description: Web logout expires __Host-mimir_session with Max-Age=0 and matching Path=/; HttpOnly; Secure; SameSite=Strict; no Domain. CLI logout has no session cookie.
+      x-mimir-cookie: {"name": "__Host-mimir_session", "http_only": true, "secure": true, "same_site": "Strict", "path": "/", "domain": null, "required_for": "web", "forbidden_for": "cli", "transport": "https", "max_age": 0}
+      schema:
+        type: string
   schemas:
     Error:
       type: object
@@ -1342,6 +1539,7 @@ components:
           properties:
             code:
               type: string
+              enum: [unauthenticated, forbidden, not_found, project_not_empty, conversation_version_conflict, idempotency_key_conflict, active_run_conflict, invalid_run_transition, operation_expired, operation_unknown, context_budget_exceeded, invalid_request, payload_too_large, rate_limited, dependency_unavailable, backend_timeout, ambiguous_credentials]
             message:
               type: string
             details:
@@ -1407,7 +1605,7 @@ components:
     Conversation:
       type: object
       additionalProperties: false
-      properties:
+      properties: &conversationProperties
         conversation_id: *id004
         project_id:
           oneOf:
@@ -1429,13 +1627,33 @@ components:
       - conversation_version
       - status
       - updated_at
+    ConversationDetail:
+      type: object
+      additionalProperties: false
+      properties:
+        <<: *conversationProperties
+        active_run_id:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+          description: "S01-DISCOVERY: eligible nonterminal conversational run at the same read snapshot, or null; always present. Derived reference; no canonical version/timestamp update."
+      required:
+      - conversation_id
+      - project_id
+      - title
+      - conversation_version
+      - status
+      - updated_at
+      - active_run_id
     MessageContent:
       type: object
       additionalProperties: false
       properties:
         format:
           const: text/v1
-        text: *id006
+        text:
+          allOf: [*id006]
+          x-max-utf8-bytes: 1048576
       required:
       - format
       - text
@@ -1454,10 +1672,7 @@ components:
           - tool
         status:
           enum:
-          - pending
           - completed
-          - failed
-          - interrupted
         ordinal: &id008
           type: integer
         content:
@@ -1520,6 +1735,22 @@ components:
       - created_at
       - completed_at
       - cancellation_requested
+      allOf:
+      - if:
+          properties:
+            status: {const: completed}
+        then:
+          properties:
+            final_text: {type: string}
+        else:
+          properties:
+            final_text: {type: 'null'}
+      - if:
+          properties:
+            status: {enum: [completed, failed, cancelled, interrupted]}
+        then:
+          properties:
+            cancellation_requested: {const: false}
       description: Authoritative run resource. On completed status final_text is non-null and canonical (subject
         to seven-day standalone retention). On noncompleted status final_text is null. Cancellation_requested does
         not by itself imply cancelled.
@@ -1657,16 +1888,32 @@ components:
       - username
       - password
       - client_type
-    LoginResponse:
+    CliLoginResponse:
       type: object
       additionalProperties: false
       properties:
-        access_token: *id006
+        access_token:
+          type: string
+          description: Fresh opaque 256-bit CLI session credential. Never log or commit example values.
         session:
-          $ref: '#/components/schemas/Session'
-      required:
-      - access_token
-      - session
+          allOf:
+          - $ref: '#/components/schemas/Session'
+          - properties:
+              client_type:
+                const: cli
+      required: [access_token, session]
+    WebLoginResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        session:
+          allOf:
+          - $ref: '#/components/schemas/Session'
+          - properties:
+              client_type:
+                const: web
+      required: [session]
+      description: Credential appears only in Set-Cookie, never as access_token or null JSON property.
     ProjectCreate:
       type: object
       additionalProperties: false
@@ -1754,6 +2001,7 @@ components:
           minLength: 1
           maxLength: 1048576
           description: UTF-8 max 1,048,576 bytes; server must enforce encoded length.
+          x-max-utf8-bytes: 1048576
         model_config_id: *id006
       required:
       - prompt
