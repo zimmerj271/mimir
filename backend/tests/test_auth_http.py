@@ -1,16 +1,18 @@
 """Exercise the ASGI producer with ephemeral credentials and canonical schemas."""
 
+import json
 from datetime import UTC, datetime, timedelta
+from json import JSONDecodeError
 from pathlib import Path
 from secrets import token_urlsafe
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid7
 
 import httpx
 import jsonschema
 import pytest
 import yaml
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 
 from mimir_backend.auth import (
     AuthenticationRejected,
@@ -72,8 +74,9 @@ class HTTPHarness:
         self.auth.authenticate.side_effect = self.authenticate
         guard = SessionGuard(self.auth, CLI, ORIGIN)
         app = FastAPI()
+        self.app = app
         AuthHTTP(self.auth, self.profiles, self.clock, guard).install(app)
-        self.transport = httpx.ASGITransport(app=app)
+        self.transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
 
     def client(self, url):
         return httpx.AsyncClient(transport=self.transport, base_url=url + "/api/v1/")
@@ -369,3 +372,233 @@ async def test_get_with_foreign_origin_rejected_before_renewal(harness):
     with pytest.raises(ForeignReadOrigin):
         await guard.authenticate(request)
     harness.auth.authenticate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("case", "status", "code"),
+    [
+        ("cli-login-authorization", 400, "ambiguous_credentials"),
+        ("cli-login-cookie", 400, "ambiguous_credentials"),
+        ("web-login-authorization", 400, "ambiguous_credentials"),
+        ("untrusted-login-host", 403, "forbidden"),
+        ("insecure-web-login", 403, "forbidden"),
+        ("foreign-origin-get", 403, "forbidden"),
+        ("insecure-cookie-get", 403, "forbidden"),
+        ("untrusted-session-host", 403, "forbidden"),
+        ("patch-host", 403, "forbidden"),
+        ("patch-https", 403, "forbidden"),
+        ("patch-origin", 403, "forbidden"),
+        ("patch-csrf", 403, "forbidden"),
+        ("patch-duplicate-origin", 403, "forbidden"),
+        ("patch-duplicate-csrf", 403, "forbidden"),
+        ("patch-mixed", 400, "ambiguous_credentials"),
+    ],
+)
+async def test_policy_errors_through_http_without_side_effects(
+    harness, validate, caplog, case, status, code
+):
+    secret = token_urlsafe(32)
+    web = not case.startswith("cli-")
+    token = harness.issue("", "", ClientType.WEB if web else ClientType.CLI).token
+    url = ORIGIN if web else f"http://{CLI}"
+    headers = dict(BROWSER) if web else {}
+    headers["Cookie" if web else "Authorization"] = (
+        f"{COOKIE}={token}" if web else f"Bearer {token}"
+    )
+    method, path = "POST", "auth/login"
+    body = {
+        "username": "sample",
+        "password": secret,
+        "client_type": "web" if web else "cli",
+    }
+    if case == "cli-login-cookie":
+        headers = {"Cookie": f"{COOKIE}={token}"}
+    elif case in {"cli-login-authorization", "web-login-authorization"}:
+        headers.pop("Cookie", None)
+        headers["Authorization"] = f"Bearer {token}"
+    elif case in {"untrusted-login-host", "untrusted-session-host", "patch-host"}:
+        url = "https://untrusted.invalid"
+        headers.update(
+            {
+                "X-Forwarded-Host": "browser.invalid",
+                "Forwarded": "host=browser.invalid;proto=https",
+            }
+        )
+    elif case in {"insecure-web-login", "insecure-cookie-get", "patch-https"}:
+        url = "http://browser.invalid"
+        headers["X-Forwarded-Proto"] = "https"
+    elif case in {"foreign-origin-get", "patch-origin"}:
+        headers["Origin"] = "https://other.invalid"
+    elif case == "patch-csrf":
+        del headers["X-Mimir-CSRF"]
+    elif case == "patch-mixed":
+        headers["Authorization"] = f"Bearer {token}"
+    if case.endswith("-get") or case == "untrusted-session-host":
+        method, path = "GET", "auth/session"
+        body = None
+    elif case.startswith("patch-"):
+        method, path, body = "PATCH", "users/me", {"display_name": secret}
+    header_list = list(headers.items())
+    if case in {"patch-duplicate-origin", "patch-duplicate-csrf"}:
+        name = "Origin" if case == "patch-duplicate-origin" else "X-Mimir-CSRF"
+        header_list.append((name, headers[name]))
+    async with harness.client(url) as client:
+        response = await client.request(method, path, json=body, headers=header_list)
+    assert response.status_code == status
+    validate("Error", response.json())
+    assert response.json()["error"]["code"] == code
+    assert response.json()["error"]["details"] == {}
+    assert response.headers["cache-control"] == "no-store"
+    assert "set-cookie" not in response.headers
+    assert secret not in response.text + caplog.text
+    assert token not in response.text + caplog.text
+    harness.auth.login.assert_not_awaited()
+    harness.auth.authenticate.assert_not_awaited()
+    harness.auth.logout.assert_not_awaited()
+    harness.profiles.current.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["auth/login", "users/me"])
+@pytest.mark.parametrize("client_type", list(ClientType))
+@pytest.mark.parametrize(
+    "bad_body",
+    [
+        "problem-json",
+        "form",
+        "text",
+        "missing-type",
+        "duplicate-type",
+        "malformed-json",
+        "invalid-utf8",
+        "empty",
+    ],
+)
+async def test_json_rejections_precede_authentication(
+    harness, validate, caplog, endpoint, client_type, bad_body
+):
+    secret = token_urlsafe(32)
+    token = harness.issue("", "", client_type).token
+    web = client_type == ClientType.WEB
+    headers = list(BROWSER.items()) if web else []
+    # Login carries an existing cookie only for web replacement. PATCH has a
+    # valid credential so this test detects premature implicit renewal.
+    if web:
+        headers.append(("Cookie", f"{COOKIE}={token}"))
+    elif endpoint == "users/me":
+        headers.append(("Authorization", f"Bearer {token}"))
+    body = (
+        {"username": "sample", "password": secret, "client_type": client_type}
+        if endpoint == "auth/login"
+        else {"display_name": secret}
+    )
+    content = json.dumps(body).encode()
+    content_type = {
+        "problem-json": "application/problem+json",
+        "form": "application/x-www-form-urlencoded",
+        "text": "text/plain",
+    }.get(bad_body, "application/json")
+    if bad_body != "missing-type":
+        headers.append(("Content-Type", content_type))
+    if bad_body == "duplicate-type":
+        headers.append(("Content-Type", "application/json"))
+    elif bad_body == "malformed-json":
+        content = content[:-1]
+    elif bad_body == "invalid-utf8":
+        content = content[:-1] + b' ,"invalid":"\xff"}'
+    elif bad_body == "empty":
+        content = b""
+    async with harness.client(ORIGIN if web else f"http://{CLI}") as client:
+        response = await client.request(
+            "POST" if endpoint == "auth/login" else "PATCH",
+            endpoint,
+            content=content,
+            headers=headers,
+        )
+    assert response.status_code == 422
+    validate("Error", response.json())
+    assert response.json()["error"]["code"] == "invalid_request"
+    assert response.json()["error"]["details"] == {}
+    assert response.headers["cache-control"] == "no-store"
+    assert "set-cookie" not in response.headers
+    assert secret not in response.text + caplog.text
+    assert token not in response.text + caplog.text
+    harness.auth.login.assert_not_awaited()
+    harness.auth.authenticate.assert_not_awaited()
+    harness.auth.logout.assert_not_awaited()
+    harness.profiles.current.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["body", "json"])
+@pytest.mark.parametrize("status", [400, 409, 503])
+async def test_unrelated_http_exception_during_receive_is_preserved(
+    harness, method, status
+):
+    failure = HTTPException(
+        status, detail="Receive failed", headers={"Retry-After": "3"}
+    )
+    async with harness.client(f"http://{CLI}") as client:
+        with patch.object(Request, method, side_effect=failure):
+            response = await client.post(
+                "auth/login",
+                json={
+                    "username": "sample",
+                    "password": token_urlsafe(32),
+                    "client_type": "cli",
+                },
+            )
+    assert response.status_code == status
+    assert response.json() == {"detail": "Receive failed"}
+    assert response.headers["retry-after"] == "3"
+    harness.auth.login.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["body", "json", "login"])
+async def test_genuine_server_failure_is_preserved(harness, source):
+    async with harness.client(f"http://{CLI}") as client:
+        body = {
+            "username": "sample",
+            "password": token_urlsafe(32),
+            "client_type": "cli",
+        }
+        if source == "login":
+            harness.auth.login.side_effect = RuntimeError("Service failure")
+            response = await client.post("auth/login", json=body)
+        else:
+            with patch.object(
+                Request, source, side_effect=RuntimeError("Receive failure")
+            ):
+                response = await client.post("auth/login", json=body)
+    assert response.status_code == 500
+    assert response.text == "Internal Server Error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error",
+    [
+        JSONDecodeError("Service JSON failure", "", 0),
+        UnicodeDecodeError("utf-8", b"\xff", 0, 1, "Service encoding failure"),
+    ],
+)
+@pytest.mark.parametrize("source", ["body", "login"])
+async def test_receive_and_service_decoding_failures_are_not_request_errors(
+    harness, error, source
+):
+    async with harness.client(f"http://{CLI}") as client:
+        body = {
+            "username": "sample",
+            "password": token_urlsafe(32),
+            "client_type": "cli",
+        }
+        if source == "login":
+            harness.auth.login.side_effect = error
+            response = await client.post("auth/login", json=body)
+        else:
+            with patch.object(Request, "body", side_effect=error):
+                response = await client.post("auth/login", json=body)
+    assert response.status_code == 500
+    assert response.text == "Internal Server Error"

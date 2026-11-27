@@ -246,7 +246,9 @@
       "origin": "https://browser.invalid",
       "csrf": "1"
     },
-    "allowed": false
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
   },
   {
     "name": "insecure-web-login",
@@ -260,7 +262,9 @@
       "login": true,
       "client_type": "web"
     },
-    "allowed": false
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
   },
   {
     "name": "untrusted-host",
@@ -273,7 +277,9 @@
       "csrf": "1",
       "trusted_host": false
     },
-    "allowed": false
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
   },
   {
     "name": "foreign-origin-get",
@@ -285,7 +291,9 @@
       "origin": "https://attacker.invalid",
       "csrf": "1"
     },
-    "allowed": false
+    "allowed": false,
+    "http_status": 403,
+    "error_code": "forbidden"
   },
   {
     "name": "form-body",
@@ -299,7 +307,9 @@
       "has_json_body": true,
       "content_type": "application/x-www-form-urlencoded"
     },
-    "allowed": false
+    "allowed": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
   },
   {
     "name": "login-authorization",
@@ -308,7 +318,9 @@
       "client_type": "cli",
       "authorization_count": 1
     },
-    "allowed": false
+    "allowed": false,
+    "http_status": 400,
+    "error_code": "ambiguous_credentials"
   },
   {
     "name": "cli-login-cookie",
@@ -317,6 +329,62 @@
       "client_type": "cli",
       "cookie_count": 1
     },
-    "allowed": false
+    "allowed": false,
+    "http_status": 400,
+    "error_code": "ambiguous_credentials"
+  },
+  {
+    "name": "malformed-json-body",
+    "facts": {
+      "authorization_count": 1,
+      "stored_client_type": "cli",
+      "mutation": true,
+      "has_json_body": true,
+      "content_type": "application/json",
+      "body_parse_error": "malformed_json"
+    },
+    "allowed": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
+  },
+  {
+    "name": "invalid-utf8-body",
+    "facts": {
+      "authorization_count": 1,
+      "stored_client_type": "cli",
+      "mutation": true,
+      "has_json_body": true,
+      "content_type": "application/json",
+      "body_parse_error": "invalid_utf8"
+    },
+    "allowed": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
+  },
+  {
+    "name": "problem-json-body",
+    "facts": {
+      "authorization_count": 1,
+      "stored_client_type": "cli",
+      "mutation": true,
+      "has_json_body": true,
+      "content_type": "application/problem+json"
+    },
+    "allowed": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
+  },
+  {
+    "name": "missing-content-type",
+    "facts": {
+      "authorization_count": 1,
+      "stored_client_type": "cli",
+      "mutation": true,
+      "has_json_body": true,
+      "content_type": null
+    },
+    "allowed": false,
+    "http_status": 422,
+    "error_code": "invalid_request"
   }
 ]

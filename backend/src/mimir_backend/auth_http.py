@@ -1,14 +1,16 @@
 """FastAPI routes for the T09 authentication boundary."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Coroutine
 from contextlib import asynccontextmanager
 from datetime import datetime
+from json import JSONDecodeError
 from typing import Annotated
 from uuid import UUID, uuid7
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from sqlalchemy import URL
 
@@ -30,8 +32,12 @@ from mimir_backend.session_guard import (
     AmbiguousCredentials,
     ExpectedJSON,
     Forbidden,
+    ForeignReadOrigin,
+    InsecureBrowserTransport,
+    LoginCredentialConflict,
     Principal,
     SessionGuard,
+    UntrustedHost,
 )
 
 
@@ -67,6 +73,41 @@ class InvalidRequest(Exception):
     pass
 
 
+class JSONRequestRoute(APIRoute):
+    """Check JSON transport and parsing before FastAPI resolves dependencies.
+
+    Request.json() caches the decoded value for the framework. Catch only input
+    decoding failures here, leaving receive errors and handler failures intact.
+    """
+
+    def get_route_handler(self) -> Callable[[Request], Coroutine[None, None, Response]]:
+        handler = super().get_route_handler()
+
+        async def checked(request: Request) -> Response:
+            if self.body_field is not None:
+                self.require_json(request)
+                body = await request.body()
+                try:
+                    # json.loads(bytes) also accepts UTF-16/32. HTTP JSON bodies
+                    # use UTF-8, so validate the encoding before Request.json().
+                    body.decode("utf-8")
+                    await request.json()
+                except UnicodeDecodeError, JSONDecodeError:
+                    raise InvalidRequest from None
+            return await handler(request)
+
+        return checked
+
+    @staticmethod
+    def require_json(request: Request) -> None:
+        types = request.headers.getlist("content-type")
+        if (
+            len(types) != 1
+            or types[0].split(";", 1)[0].strip().lower() != "application/json"
+        ):
+            raise ExpectedJSON
+
+
 class AuthHTTP:
     def __init__(
         self, auth: AuthService, profiles: Profiles, clock: Clock, guard: SessionGuard
@@ -77,7 +118,7 @@ class AuthHTTP:
         self.guard = guard
 
     def install(self, app: FastAPI) -> None:
-        router = app.router
+        router = APIRouter(route_class=JSONRequestRoute)
         # Bind the shared guard once. The same owner context is available to future routes.
         principal = Depends(self.guard.authenticate)
 
@@ -85,7 +126,6 @@ class AuthHTTP:
         async def login(
             body: LoginRequest, request: Request, response: Response
         ) -> CliLoginResponse | WebLoginResponse:
-            self.require_json(request)
             self.guard.login(request, body.client_type)
             issued = await self.auth.login(
                 body.username, body.password.get_secret_value(), body.client_type
@@ -122,10 +162,7 @@ class AuthHTTP:
             return await self.profile(actor.session, None)
 
         @router.patch("/api/v1/users/me", operation_id="patchMe")
-        async def patch_me(
-            body: UserPatch, request: Request, actor: Principal = principal
-        ) -> User:
-            self.require_json(request)
+        async def patch_me(body: UserPatch, actor: Principal = principal) -> User:
             if body.display_name is not None:
                 try:
                     if len(body.display_name.encode("utf-8")) > 1_048_576:
@@ -134,6 +171,7 @@ class AuthHTTP:
                     raise InvalidRequest from None
             return await self.profile(actor.session, body)
 
+        app.include_router(router)
         for exc_type in ERROR_RESPONSES:
             app.add_exception_handler(exc_type, self.error)
 
@@ -142,15 +180,6 @@ class AuthHTTP:
         if user is None:
             raise ProfileMissing
         return user
-
-    @staticmethod
-    def require_json(request: Request) -> None:
-        types = request.headers.getlist("content-type")
-        if (
-            len(types) != 1
-            or types[0].split(";", 1)[0].strip().lower() != "application/json"
-        ):
-            raise ExpectedJSON
 
     @staticmethod
     def cookie(response: Response, value: str, max_age: int) -> None:
@@ -184,6 +213,11 @@ class AuthHTTP:
 ERROR_RESPONSES: dict[type[Exception], tuple[int, str]] = {
     AuthenticationRejected: (401, "unauthenticated"),
     AmbiguousCredentials: (400, "ambiguous_credentials"),
+    LoginCredentialConflict: (400, "ambiguous_credentials"),
+    UntrustedHost: (403, "forbidden"),
+    InsecureBrowserTransport: (403, "forbidden"),
+    ForeignReadOrigin: (403, "forbidden"),
+    ExpectedJSON: (422, "invalid_request"),
     Forbidden: (403, "forbidden"),
     ProfileMissing: (404, "not_found"),
     AuthStorageError: (503, "dependency_unavailable"),

@@ -140,3 +140,22 @@ semantic mutation tests. S01-PAGE and S01-AUTH public behavior is unchanged.
 Contract 1.0.0 remains the initial candidate, pending renewed independent review
 and explicit human contract/merge approval. This approval authorizes remediation,
 not acceptance of findings by the independent reviewer or task completion.
+
+## Owner-approved T09 independent-review remediation
+
+The owner accepted T09-R1 and authorized its HTTP error mappings. LoginCredentialConflict
+returns 400 `ambiguous_credentials`. UntrustedHost, InsecureBrowserTransport and
+ForeignReadOrigin return 403 `forbidden`. ExpectedJSON, malformed JSON and invalid
+UTF-8 request-body parsing failures return 422 `invalid_request`. The canonical
+Error envelope and existing catalog apply. Parsing translation is confined to
+request-body decoding, preserving unrelated HTTP exceptions and server failures.
+JSON transport/parsing and browser security checks precede session renewal and
+profile mutation. The normative details and agreement fixtures are in
+[HTTP semantics](../../contracts/HTTP_SEMANTICS.md) and
+[auth cases](../../contracts/fixtures/auth-cases.json).
+
+The owner also accepted T09-R2 and authorized the scoped T09 coverage entry in
+`TRACEABILITY.md`. This records executable paths, verification evidence and
+limitations while preserving existing normative acceptance ownership and
+later-task verification responsibilities. The corrections require renewed
+independent review and human merge authorization.

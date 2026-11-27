@@ -4736,9 +4736,49 @@ async def test_t09_http_real_roles_renewal_profile_logout(tmp_path):
                 }
                 assert (await web.get("users/me")).json() == profile
                 assert (await cli.get("users/me", headers=bearer)).json() == profile
+                session_state_sql = (
+                    "SELECT client_type,last_used_at,expires_at,revoked_at "
+                    f"FROM auth.sessions WHERE user_id='{services.user}' "
+                    "ORDER BY client_type,created_at"
+                )
+                session_state = database.sql(session_state_sql).stdout
+                rejected = [
+                    await web.patch("users/me", json={"display_name": "wrong"}),
+                    await web.patch(
+                        "users/me",
+                        json={"display_name": "wrong"},
+                        headers={**browser, "Origin": "https://other.invalid"},
+                    ),
+                    await web.patch(
+                        "users/me",
+                        json={"display_name": "wrong"},
+                        headers={**browser, "Host": "untrusted.invalid"},
+                    ),
+                ]
+                for response in rejected:
+                    assert response.status_code == 403
+                    assert response.json()["error"]["code"] == "forbidden"
+                for content, media_type in [
+                    (b'{"display_name":"wrong"}', "application/problem+json"),
+                    (b'{"display_name":"wrong"', "application/json"),
+                    (b'{"display_name":"wrong\xff"}', "application/json"),
+                ]:
+                    for client, headers in [(cli, bearer), (web, browser)]:
+                        response = await client.patch(
+                            "users/me",
+                            content=content,
+                            headers={**headers, "Content-Type": media_type},
+                        )
+                        assert response.status_code == 422
+                        assert response.json()["error"]["code"] == "invalid_request"
+                assert database.sql(session_state_sql).stdout == session_state
                 assert (
-                    await web.patch("users/me", json={"display_name": "wrong"})
-                ).status_code == 403
+                    database.sql(
+                        f"SELECT display_name IS NULL FROM archive.users WHERE user_id='{services.user}'"
+                    ).stdout.strip()
+                    == "t"
+                )
+
                 profile["display_name"] = "updated"
                 assert (
                     await web.patch(
