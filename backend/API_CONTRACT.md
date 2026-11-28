@@ -41,6 +41,16 @@
 `{ "error": { "code": "stable_code", "message": "Human-readable message", "details": {} }, "request_id": "..." }`. HTTP 400/401/403/404/409/413/422/429/503/504 as appropriate. Typed codes for `conversation_version_conflict`, `idempotency_key_conflict`, `context_budget_exceeded`, dependency degradation and run conflicts. Cursors opaque, user/filter scoped with deterministic unique-tiebreak ordering.
 
 ## Transport independence
+
+T10 implements internal domain/repository operations, not new HTTP producers.
+T11 must consume its shared visibility/transaction boundary for existing resource
+routes and use the same transaction for accepted-operation idempotency. Opaque
+cursor integrity/owner/filter binding remains T11; T10 supplies typed keysets.
+Established conversation/ancestor fences produce the ordinary concealed resource
+absence; inactive or account-fenced principals retain authentication failure.
+Visibility dependency errors remain failures, never null active-run or empty-page
+fallbacks. The [authorized foundation](../docs/decisions/T10_CONVERSATION_VISIBILITY.md)
+does not implement production DELETE acceptance, cleanup or restore safety.
 Domain events carry run/job/correlation IDs and typed payloads. Publisher/subscriber interface independent of SSE. Future WebSockets **optional**, not required v2; internal event channel initially in-process, connection-independent durable PostgreSQL run state.
 
 

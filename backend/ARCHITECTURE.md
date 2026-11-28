@@ -148,3 +148,23 @@ partial uniqueness, owner scope/RLS/visibility/deletion fences; no additional
 canonical state, migration, version increment or activity timestamp update.
 T20/T28 verify actual schema and client conformance. S01 supplies contract-only
 agreement scenarios; see [HTTP semantics](../contracts/HTTP_SEMANTICS.md).
+
+## Owner-approved T10 visibility foundation
+
+T10 supplies transaction-scoped project/conversation repositories and services,
+canonical flattened history, version-guarded metadata/project reassignment and
+immutable branch prefix creation. Its read-only REPEATABLE READ boundary keeps
+account eligibility, conversation metadata and derived run identity consistent.
+Writes use READ COMMITTED with account-before-conversation locks and parent-prefix
+reads after locking. T11 may include its operation ledger on the same connection;
+T10 does not implement HTTP handlers, opaque cursors or idempotency acceptance.
+
+V008 adds established owner/root conversation fences with no runtime writer.
+The invoker-rights visible-conversation view filters fenced roots/descendants and
+established account fences under RLS. Archived conversations remain explicit
+readable resources; latest-active excludes them. Account ineligibility is uniform
+authentication rejection; conversation ineligibility is concealed as not-found.
+No-op metadata and all discovery reads preserve versions/timestamps. See the
+[physical proposal and deferred concurrency obligations](../docs/decisions/T10_CONVERSATION_VISIBILITY.md).
+T35/T36/T37 retain orchestration, establishment/writer coordination, cleanup and
+restore guarantees. Privileged disposable fixtures supply fence test inputs.

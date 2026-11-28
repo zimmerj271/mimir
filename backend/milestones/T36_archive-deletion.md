@@ -11,7 +11,23 @@ Delete conversation subtree/attachments/artifacts while retaining managed memori
 ## Out of scope
 Do not implement successor tasks, change shared contracts or introduce major dependencies without approval. No public per-memory CRUD, application-owned canonical memory tables, hidden direct client database/provider access, or future-web implementation.
 
+## Owner-approved T10/T36 boundary
+
+T10 establishes V008 owner/root fence storage, immutable hierarchy lookup, forced
+RLS, runtime SELECT-only privileges and the shared visibility boundary. Its tests
+establish fences using privileged disposable fixtures. This is infrastructure;
+production fence establishment is not implemented or authorized by T10.
+
+T36 owns restricted production fence establishment, atomic deletion acceptance,
+coordination with branch creation and all archive/runtime writers, active-run and
+ingestion coordination, physical archive cleanup and deletion-journal integration.
+Coordinate restrictive root FK/fence removal only when safely removing the subtree;
+no implicit fence expiry. T35 owns account deletion orchestration/revocation and
+T37 owns restoration/journal replay. Preserve established-fence enforcement and
+public 202 semantics. See [retention and concurrency requirements](../../docs/decisions/T10_CONVERSATION_VISIBILITY.md).
+
 ## Required test scenarios and acceptance
+
 Nested branch subtree purge and no future ingest from deleted message revisions. Add pertinent failure, auth, boundary and concurrency tests. Prefer deterministic unit tests where possible and real-service integration tests when persistence/provider guarantees are involved.
 
 ## Required engineering review

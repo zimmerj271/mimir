@@ -22,6 +22,7 @@ Target PostgreSQL 18; prefer 18 when validated. UUIDv7 generated in application.
 | `runtime.jobs`, `runtime.memory_ingestions` | Generic durable job claims plus memory delivery status, exact source revision IDs |
 | `runtime.operation_ledger` | Idempotency key + request fingerprint + response identity under user scope |
 | `runtime.deletion_controls` | Fenced user purge and restoration tombstone/journal handling |
+| `runtime.conversation_deletion_fences` | Established owner/root fence; descendants inherit through immutable parents; T10 read enforcement, T36 production writer/cleanup |
 | `runtime.outbox_events` | Optional durable publication of domain events where needed; no duplicate job hop required |
 | `runtime.context_assembly_records` | Selected source IDs, budget/degradation and optional prompt artifact reference |
 
@@ -57,6 +58,16 @@ PostgreSQL 18 migration, privilege and integrity evidence; v2-reference SQL is
 non-normative.
 
 ## Required SQL verification
+
+Owner-approved T10 adds forward-only V008, preserving V001–V007 (T09 already
+owns V007). The [physical proposal](../docs/decisions/T10_CONVERSATION_VISIBILITY.md)
+defines restrictive composite root integrity, immutable fence rows, FORCE RLS,
+SELECT-only API/worker privileges and the invoker-rights visibility view. Account
+controls with non-null fenced_at conceal the account; requested-only controls do
+not. No new lifecycle states, TTL, production writer or deletion grant is added.
+T36 must coordinate future fence establishment with archive/runtime writers and
+cleanup; T37 owns journal replay. Short snapshot reads enforce established fences
+without claiming linearization against a future fence writer.
 - Fresh migrate and second migrate/validate on supported PostgreSQL; inspect catalog constraints, RLS policies, role grants, indexes, triggers and migration checksum history.
 - Attempts at forged user_id, cross-owner FKs, missing actor context, malformed branch snapshots, revision updates, unsafe purge and duplicate active runs must fail.
 - Execute competing PostgreSQL transactions for message submission/version CAS, branch creation and job claiming; verify no duplicates or lost updates.

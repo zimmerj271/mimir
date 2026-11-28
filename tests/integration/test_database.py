@@ -37,6 +37,7 @@ from mimir_backend.auth import (
     ClientType,
     PasswordService,
     ProvisioningService,
+    Session,
     SessionTokens,
     SystemClock,
 )
@@ -45,6 +46,22 @@ from mimir_backend.auth_postgres import (
     AuthDatabase,
     PostgresAuthRepository,
     PostgresProvisioningRepository,
+)
+from mimir_backend.conversation_postgres import ArchiveDatabase
+from mimir_backend.conversations import (
+    ArchiveNotFound,
+    ArchiveStorageError,
+    BranchCreate,
+    ConversationCreate,
+    ConversationPatch,
+    ConversationService,
+    ConversationVersionConflict,
+    InvalidBranchPoint,
+    ListingBoundary,
+    ProjectCreate,
+    ProjectPatch,
+    ProjectService,
+    UUID7IDs,
 )
 from mimir_backend.provision import MaintenanceCommand
 
@@ -124,6 +141,7 @@ class DatabaseStack:
     def docker(
         self, *args: str, input: str | None = None, check: bool = True
     ) -> subprocess.CompletedProcess:
+        __tracebackhide__ = True  # stdin may contain disposable DB credentials.
         result = subprocess.run(
             ["docker", *args],
             env=self.env,
@@ -4852,3 +4870,916 @@ async def test_t09_http_real_roles_renewal_profile_logout(tmp_path):
             await services.close()
     finally:
         database.cleanup()
+
+
+# T10: real service/repository calls, using privileged synthetic principal/fence
+# fixtures. No production deletion writer or message executor is implemented here.
+V008 = "V008__conversation_visibility_fences.sql"
+
+
+@pytest.fixture(scope="module")
+def conversation_database(tmp_path_factory):
+    stack = DatabaseStack(
+        tmp_path_factory.mktemp("conversation-domain"), through_version=8
+    )
+    try:
+        stack.start()
+        stack.migrate()
+        yield stack
+    finally:
+        stack.cleanup()
+
+
+class ConversationCases(RuntimeRows):
+    def __init__(self, stack):
+        super().__init__(stack)
+        info = json.loads(stack.compose("ps", "--format", "json").stdout)
+        if isinstance(info, list):
+            info = info[0]
+        container = json.loads(stack.docker("inspect", info["ID"]).stdout)[0]
+        host = next(iter(container["NetworkSettings"]["Networks"].values()))[
+            "IPAddress"
+        ]
+        self.archive = ArchiveDatabase(
+            URL.create(
+                "postgresql+psycopg",
+                username="mimir_api",
+                host=host,
+                database="mimir",
+                password=stack.passwords["mimir_api"].read_text().strip(),
+            ),
+            SystemClock(),
+        )
+        now = datetime.now(UTC)
+        # Principal fixture models the already verified T09 authentication result.
+        self.session = Session(
+            uuid.UUID(self.user),
+            uuid.uuid7(),
+            ClientType.CLI,
+            now,
+            now + timedelta(days=30),
+            now + timedelta(days=90),
+            None,
+            "active",
+        )
+
+    def service(self, unit):
+        return ConversationService(
+            unit.conversations, unit.projects, SystemClock(), UUID7IDs()
+        )
+
+    def projects(self, unit):
+        return ProjectService(unit.projects, UUID7IDs())
+
+    def fence(self, root):
+        self.owner(
+            f"INSERT INTO runtime.conversation_deletion_fences(user_id,root_conversation_id) "
+            f"VALUES ('{self.user}','{root}')"
+        )
+
+    def account_fence(self, state):
+        identity = uuid.uuid7()
+        self.database.sql(
+            f"INSERT INTO runtime.deletion_controls(deletion_id,user_id) "
+            f"VALUES ('{identity}','{self.user}')"
+        )
+        if state == "requested":
+            return
+        self.database.sql(
+            f"UPDATE runtime.deletion_controls SET status='fenced',fence_token='{uuid.uuid4()}',"
+            f"fenced_at=clock_timestamp(),journal_reference='synthetic-fixture' "
+            f"WHERE deletion_id='{identity}'"
+        )
+        if state == "fenced":
+            return
+        self.database.sql(
+            f"UPDATE runtime.deletion_controls SET status='purging' WHERE deletion_id='{identity}'"
+        )
+        if state == "purging":
+            return
+        if state == "verification_required":
+            self.database.sql(
+                f"UPDATE runtime.deletion_controls SET status='verification_required' WHERE deletion_id='{identity}'"
+            )
+        else:
+            self.database.sql(
+                f"UPDATE runtime.deletion_controls SET status='complete',completed_at=clock_timestamp() WHERE deletion_id='{identity}'"
+            )
+
+    async def branch(self, parent=None, source=None, mode="after_revision"):
+        async with self.archive.transaction(self.session, write=True) as unit:
+            service = self.service(unit)
+            parent = uuid.UUID(str(parent or self.conversation))
+            detail = await service.get(parent)
+            return await service.branch(
+                parent,
+                BranchCreate(
+                    mode=mode,
+                    source_revision_id=uuid.UUID(str(source or self.revision)),
+                    expected_conversation_version=detail.conversation_version,
+                    title="synthetic branch",
+                ),
+            )
+
+    async def wait_for_api_lock(self):
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            count = self.database.sql(
+                "SELECT count(*) FROM pg_stat_activity WHERE usename='mimir_api' AND wait_event_type='Lock'"
+            ).stdout.strip()
+            if int(count) > 0:
+                return
+            await asyncio.sleep(0.02)
+        raise AssertionError("Branch caller did not reach the parent lock")
+
+
+class FixedArchiveClock:
+    def __init__(self, value):
+        self.value = value
+
+    def now(self):
+        return self.value
+
+
+@pytest_asyncio.fixture
+async def conversation_cases(conversation_database):
+    cases = ConversationCases(conversation_database)
+    cases.seed()
+    try:
+        yield cases
+    finally:
+        await cases.archive.close()
+
+
+def test_t10_fresh_repeat_restart_catalog_and_runtime_privileges(conversation_database):
+    stack = conversation_database
+    query = "SELECT version,checksum,success FROM public.flyway_schema_history ORDER BY installed_rank"
+    before = stack.sql(query).stdout
+    assert [row.split("|")[0] for row in before.splitlines()] == [
+        f"{i:03}" for i in range(1, 9)
+    ]
+    stack.migrate()
+    stack.flyway("validate")
+    stack.compose("restart", "postgres")
+    stack.compose("up", "-d", "--wait", "postgres")
+    stack.flyway("validate")
+    assert stack.sql(query).stdout == before
+    assert stack.sql("""
+        SELECT pg_get_userbyid(relowner),relrowsecurity,relforcerowsecurity
+        FROM pg_class WHERE oid='runtime.conversation_deletion_fences'::regclass;
+        SELECT reloptions @> ARRAY['security_invoker=true'] FROM pg_class
+            WHERE oid='archive.visible_conversations'::regclass
+    """).stdout.splitlines() == ["mimir_owner|t|t", "t"]
+    for role in RUNTIME:
+        readable = role in ("api", "worker")
+        for table in (
+            "runtime.conversation_deletion_fences",
+            "archive.visible_conversations",
+        ):
+            assert stack.sql(
+                f"SELECT has_table_privilege('mimir_{role}','{table}','SELECT')"
+            ).stdout.strip() == ("t" if readable else "f")
+            assert (
+                stack.sql(
+                    f"SELECT has_table_privilege('mimir_{role}','{table}','INSERT,UPDATE,DELETE,TRUNCATE')"
+                ).stdout.strip()
+                == "f"
+            )
+        assert stack.sql(
+            "SELECT count(*) FROM runtime.conversation_deletion_fences",
+            f"mimir_{role}",
+            check=readable,
+        ).returncode == (0 if readable else 3)
+
+
+def test_t10_v007_upgrade_failure_recovery_and_checksum_drift(tmp_path):
+    stack = DatabaseStack(tmp_path, through_version=7)
+    try:
+        stack.start()
+        stack.migrate()
+        rows = BranchRows(stack)
+        rows.seed()
+        child = rows.create_branch()
+        rows.create_branch(parent=child)
+        data = stack.sql(
+            "SELECT * FROM archive.conversation_visible_revisions ORDER BY conversation_id,ordinal"
+        ).stdout
+        history = "SELECT version,checksum FROM public.flyway_schema_history ORDER BY installed_rank"
+        before = stack.sql(history).stdout
+        original = (ROOT / "backend/migrations" / V008).read_bytes()
+        candidate = stack.migrations / V008
+        candidate.write_bytes(original + b"\nSELECT 1/0;\n")
+        assert stack.flyway("migrate", check=False).returncode != 0
+        assert stack.sql(history).stdout == before
+        assert (
+            stack.sql(
+                "SELECT to_regclass('runtime.conversation_deletion_fences') IS NULL"
+            ).stdout.strip()
+            == "t"
+        )
+        assert (
+            stack.sql(
+                "SELECT * FROM archive.conversation_visible_revisions ORDER BY conversation_id,ordinal"
+            ).stdout
+            == data
+        )
+        candidate.write_bytes(original)
+        stack.migrate()
+        stack.flyway("validate")
+        assert (
+            stack.sql(
+                "SELECT * FROM archive.conversation_visible_revisions ORDER BY conversation_id,ordinal"
+            ).stdout
+            == data
+        )
+        candidate.write_bytes(original + b"\n-- checksum drift probe\n")
+        assert stack.flyway("validate", check=False).returncode != 0
+        candidate.write_bytes(original)
+        stack.flyway("validate")
+    finally:
+        stack.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_t10_nested_snapshot_history_and_zero_prefix(conversation_cases):
+    rows = conversation_cases
+    root = uuid.UUID(rows.conversation)
+    second, third = uuid.uuid7(), uuid.uuid7()
+    rows.actor(
+        rows.message_sql(2, revision=str(second), role="assistant")
+        + ";"
+        + rows.message_sql(3, revision=str(third))
+    )
+    child = await rows.branch(source=second)
+    child_revision = uuid.uuid7()
+    original = rows.conversation
+    rows.conversation = str(child.conversation_id)
+    rows.actor(rows.message_sql(1, revision=str(child_revision)))
+    rows.conversation = original
+    grandchild = await rows.branch(
+        child.conversation_id, child_revision, "replace_message"
+    )
+    empty = await rows.branch(mode="replace_message")
+    rows.actor(rows.message_sql(4))
+    async with rows.archive.transaction(rows.session) as unit:
+        service = rows.service(unit)
+        child_history = await service.history(child.conversation_id)
+        nested = await service.history(grandchild.conversation_id)
+        assert [m.revision_id for m in nested.items] == [
+            uuid.UUID(rows.revision),
+            second,
+        ]
+        assert [m.revision_id for m in child_history.items] == [
+            uuid.UUID(rows.revision),
+            second,
+            child_revision,
+        ]
+        assert [m.ordinal for m in child_history.items] == [1, 2, 3]
+        assert all(
+            m.conversation_id == child.conversation_id for m in child_history.items
+        )
+        assert (await service.history(empty.conversation_id)).items == ()
+        assert len((await service.history(root)).items) == 4
+        assert child.project_id == grandchild.project_id == uuid.UUID(rows.project)
+    assert (
+        rows.actor(
+            f"SELECT count(*) FROM archive.messages WHERE conversation_id IN ('{grandchild.conversation_id}','{empty.conversation_id}')"
+        ).stdout.strip()
+        == "0"
+    )
+    assert rows.actor(
+        "SELECT count(*) FROM runtime.jobs; SELECT count(*) FROM runtime.model_runs"
+    ).stdout.splitlines() == ["0", "0"]
+
+
+@pytest.mark.asyncio
+async def test_t10_reassignment_noop_versions_and_provenance(conversation_cases):
+    rows = conversation_cases
+    root = uuid.UUID(rows.conversation)
+    child = await rows.branch()
+    rows.actor(rows.run_sql() + ";" + rows.job_sql())
+    rows.actor(rows.running_sql(), role="worker")
+    success, revision = rows.success_sql()
+    rows.actor(success + ";" + rows.ingestion_sql(revision), role="worker")
+    evidence = "SELECT * FROM archive.message_revisions ORDER BY revision_id; SELECT * FROM archive.conversation_branch_revisions ORDER BY conversation_id,ordinal; SELECT * FROM runtime.memory_ingestions ORDER BY ingestion_id"
+    before = rows.database.sql(evidence).stdout
+    async with rows.archive.transaction(rows.session, write=True) as unit:
+        service = rows.service(unit)
+        initial = await service.get(root)
+        project = await rows.projects(unit).create(ProjectCreate(name="destination"))
+        moved = await service.patch(
+            root,
+            ConversationPatch(
+                expected_conversation_version=1, project_id=project.project_id
+            ),
+        )
+        assert (
+            moved.conversation_version == 2 and moved.updated_at >= initial.updated_at
+        )
+        noop = await service.patch(
+            root,
+            ConversationPatch(
+                expected_conversation_version=2,
+                project_id=project.project_id,
+                title=moved.title,
+            ),
+        )
+        assert noop == moved
+        unassigned = await service.patch(
+            root, ConversationPatch(expected_conversation_version=2, project_id=None)
+        )
+        assert unassigned.project_id is None and unassigned.conversation_version == 3
+        assert (await service.get(child.conversation_id)).project_id == uuid.UUID(
+            rows.project
+        )
+    assert rows.database.sql(evidence).stdout == before
+    async with rows.archive.transaction(rows.session, write=True) as unit:
+        with pytest.raises(ConversationVersionConflict):
+            await rows.service(unit).patch(
+                root, ConversationPatch(expected_conversation_version=2, title="stale")
+            )
+        with pytest.raises(ConversationVersionConflict):
+            await rows.service(unit).branch(
+                root,
+                BranchCreate(
+                    mode="after_revision",
+                    source_revision_id=uuid.UUID(rows.revision),
+                    expected_conversation_version=2,
+                    title="stale",
+                ),
+            )
+
+
+@pytest.mark.asyncio
+async def test_t10_concurrent_metadata_cas_exactly_one_commit(conversation_cases):
+    rows = conversation_cases
+
+    async def update(title):
+        async with rows.archive.transaction(rows.session, write=True) as unit:
+            return await rows.service(unit).patch(
+                uuid.UUID(rows.conversation),
+                ConversationPatch(expected_conversation_version=1, title=title),
+            )
+
+    outcomes = await asyncio.gather(
+        update("first"), update("second"), return_exceptions=True
+    )
+    assert (
+        sum(isinstance(result, ConversationVersionConflict) for result in outcomes) == 1
+    )
+    assert sum(not isinstance(result, BaseException) for result in outcomes) == 1
+    assert (
+        rows.actor(
+            f"SELECT conversation_version FROM archive.conversations WHERE conversation_id='{rows.conversation}'"
+        ).stdout.strip()
+        == "2"
+    )
+
+
+@pytest.mark.asyncio
+async def test_t10_foreign_resources_and_nonvisible_revision_denied(conversation_cases):
+    rows = conversation_cases
+    other = ArchiveRows(rows.database)
+    other.seed()
+    root = uuid.UUID(rows.conversation)
+    async with rows.archive.transaction(rows.session, write=True) as unit:
+        service = rows.service(unit)
+        for identity in (uuid.UUID(other.conversation), uuid.uuid7()):
+            for operation in (
+                lambda identity=identity: service.get(identity),
+                lambda identity=identity: service.history(identity, 501, 0),
+                lambda identity=identity: service.patch(
+                    identity,
+                    ConversationPatch(expected_conversation_version=1, title="no"),
+                ),
+                lambda identity=identity: service.branch(
+                    identity,
+                    BranchCreate(
+                        mode="after_revision",
+                        source_revision_id=uuid.UUID(rows.revision),
+                        expected_conversation_version=1,
+                        title="no",
+                    ),
+                ),
+            ):
+                with pytest.raises(ArchiveNotFound):
+                    await operation()
+        with pytest.raises(ArchiveNotFound):
+            await rows.projects(unit).get(uuid.UUID(other.project))
+        with pytest.raises(ArchiveNotFound):
+            await service.patch(
+                root,
+                ConversationPatch(
+                    expected_conversation_version=1, project_id=uuid.UUID(other.project)
+                ),
+            )
+        with pytest.raises(ArchiveNotFound):
+            await service.create(
+                ConversationCreate(title="no", project_id=uuid.UUID(other.project))
+            )
+        for source in (uuid.UUID(other.revision), uuid.uuid7()):
+            with pytest.raises(InvalidBranchPoint):
+                await service.branch(
+                    root,
+                    BranchCreate(
+                        mode="after_revision",
+                        source_revision_id=source,
+                        expected_conversation_version=1,
+                        title="no",
+                    ),
+                )
+    assert (
+        rows.actor("SELECT count(*) FROM archive.conversations").stdout.strip() == "1"
+    )
+
+
+@pytest.mark.asyncio
+async def test_t10_direct_inherited_fences_conceal_all_operations(conversation_cases):
+    rows = conversation_cases
+    child = await rows.branch()
+    nested = await rows.branch(child.conversation_id)
+    sibling = await rows.branch()
+    rows.actor(
+        rows.run_sql() + ";UPDATE runtime.model_runs SET cancellation_requested=true"
+    )
+    rows.fence(child.conversation_id)
+    async with rows.archive.transaction(rows.session, write=True) as unit:
+        service = rows.service(unit)
+        for identity in (child.conversation_id, nested.conversation_id):
+            for operation in (
+                lambda identity=identity: service.get(identity),
+                lambda identity=identity: service.history(identity),
+                lambda identity=identity: service.patch(
+                    identity,
+                    ConversationPatch(expected_conversation_version=1, project_id=None),
+                ),
+                lambda identity=identity: service.branch(
+                    identity,
+                    BranchCreate(
+                        mode="after_revision",
+                        source_revision_id=uuid.UUID(rows.revision),
+                        expected_conversation_version=1,
+                        title="no",
+                    ),
+                ),
+            ):
+                with pytest.raises(ArchiveNotFound):
+                    await operation()
+        assert (
+            await service.get(uuid.UUID(rows.conversation))
+        ).active_run_id == uuid.UUID(rows.run)
+        assert (await service.get(sibling.conversation_id)).active_run_id is None
+        assert {c.conversation_id for c in (await service.list()).items} == {
+            uuid.UUID(rows.conversation),
+            sibling.conversation_id,
+        }
+    rows.fence(rows.conversation)
+    async with rows.archive.transaction(rows.session) as unit:
+        service = rows.service(unit)
+        with pytest.raises(ArchiveNotFound):
+            await service.get(uuid.UUID(rows.conversation))
+        assert (await service.list()).items == ()
+        assert await service.latest_active() is None
+
+
+@pytest.mark.asyncio
+async def test_t10_fence_integrity_rls_and_pool_reuse(conversation_cases):
+    rows = conversation_cases
+    other = ArchiveRows(rows.database)
+    other.seed()
+    rows.fence(rows.conversation)
+    assert (
+        rows.owner(
+            "INSERT INTO runtime.conversation_deletion_fences(user_id,root_conversation_id) "
+            + f"VALUES ('{rows.user}','{rows.conversation}')",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (
+        other.actor(
+            "SELECT count(*) FROM runtime.conversation_deletion_fences"
+        ).stdout.strip()
+        == "0"
+    )
+    insert = "INSERT INTO runtime.conversation_deletion_fences(user_id,root_conversation_id) "
+    assert (
+        rows.database.sql(
+            insert + f"VALUES ('{other.user}','{rows.conversation}')", check=False
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.owner(
+            insert + f"VALUES ('{rows.user}','{uuid.uuid7()}')", check=False
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.owner(
+            "UPDATE runtime.conversation_deletion_fences SET fenced_at=clock_timestamp()",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (
+        rows.owner(
+            insert + f"VALUES ('{rows.user}','{other.conversation}')", check=False
+        ).returncode
+        != 0
+    )
+    for role in ("api", "worker"):
+        assert (
+            rows.database.sql(
+                "SELECT count(*) FROM runtime.conversation_deletion_fences",
+                f"mimir_{role}",
+            ).stdout.strip()
+            == "0"
+        )
+        assert (
+            rows.actor(
+                "SET LOCAL row_security=off; SELECT * FROM runtime.conversation_deletion_fences",
+                role,
+                check=False,
+            ).returncode
+            != 0
+        )
+        for sql in (
+            insert + f"VALUES ('{rows.user}','{rows.conversation}')",
+            "UPDATE runtime.conversation_deletion_fences SET fenced_at=clock_timestamp()",
+            "DELETE FROM runtime.conversation_deletion_fences",
+            "TRUNCATE runtime.conversation_deletion_fences",
+        ):
+            assert rows.actor(sql, role, check=False).returncode != 0
+    async with rows.archive.transaction(rows.session) as unit:
+        assert (await rows.service(unit).list()).items == ()
+    # A single checked-out connection is explicitly reused across actors and
+    # commits: transaction-local scope must not leak to subsequent pool callers.
+    async with rows.archive.engine.connect() as conn:
+        async with conn.begin():
+            await conn.execute(
+                text("SELECT set_config('app.current_user_id', :actor, true)"),
+                {"actor": rows.user},
+            )
+            assert (
+                await conn.execute(
+                    text("SELECT count(*) FROM runtime.conversation_deletion_fences")
+                )
+            ).scalar_one() == 1
+        async with conn.begin():
+            assert (
+                await conn.execute(
+                    text("SELECT count(*) FROM runtime.conversation_deletion_fences")
+                )
+            ).scalar_one() == 0
+            await conn.execute(
+                text("SELECT set_config('app.current_user_id', :actor, true)"),
+                {"actor": other.user},
+            )
+            assert (
+                await conn.execute(
+                    text("SELECT count(*) FROM archive.visible_conversations")
+                )
+            ).scalar_one() == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "state", ["requested", "fenced", "purging", "verification_required", "complete"]
+)
+async def test_t10_account_control_lifecycle_auth_failure(conversation_cases, state):
+    rows = conversation_cases
+    rows.account_fence(state)
+    for write in (False, True):
+        if state == "requested":
+            async with rows.archive.transaction(rows.session, write=write) as unit:
+                assert (
+                    await rows.service(unit).get(uuid.UUID(rows.conversation))
+                ).active_run_id is None
+        else:
+            with pytest.raises(AuthenticationRejected):
+                async with rows.archive.transaction(rows.session, write=write):
+                    pytest.fail("Established account fence allowed a transaction")
+    count = rows.actor(
+        "SELECT count(*) FROM archive.visible_conversations"
+    ).stdout.strip()
+    assert count == ("1" if state == "requested" else "0")
+
+
+@pytest.mark.asyncio
+async def test_t10_disabled_missing_expired_and_revoked_principals(conversation_cases):
+    rows = conversation_cases
+    for session in (
+        replace(rows.session, user_id=uuid.uuid7()),
+        replace(rows.session, expires_at=datetime.now(UTC) - timedelta(seconds=1)),
+        replace(rows.session, revoked_at=datetime.now(UTC)),
+        replace(rows.session, account_status="disabled"),
+    ):
+        with pytest.raises(AuthenticationRejected):
+            async with rows.archive.transaction(session):
+                pytest.fail("Invalid principal allowed a transaction")
+    rows.database.sql(
+        f"UPDATE archive.users SET status='disabled' WHERE user_id='{rows.user}'"
+    )
+    with pytest.raises(AuthenticationRejected):
+        async with rows.archive.transaction(rows.session):
+            pytest.fail("Stale principal bypassed current disabled account")
+
+
+@pytest.mark.asyncio
+async def test_t10_detail_metadata_run_and_fence_share_snapshot(conversation_cases):
+    rows = conversation_cases
+    root = uuid.UUID(rows.conversation)
+    rows.actor(rows.run_sql())
+    async with rows.archive.transaction(rows.session) as old:
+        initial = await rows.service(old).get(root)
+        rows.actor(rows.running_sql(), role="worker")
+        rows.actor(rows.finish_sql(), role="worker")
+        async with rows.archive.transaction(rows.session, write=True) as writer:
+            await rows.service(writer).patch(
+                root,
+                ConversationPatch(
+                    expected_conversation_version=1, title="new metadata"
+                ),
+            )
+        assert await rows.service(old).get(root) == initial
+        assert initial.active_run_id == uuid.UUID(rows.run)
+        async with rows.archive.transaction(rows.session) as current:
+            detail = await rows.service(current).get(root)
+            assert detail.title == "new metadata" and detail.conversation_version == 2
+            assert detail.active_run_id is None
+        rows.fence(root)
+        assert await rows.service(old).get(root) == initial
+        assert (await rows.service(old).list()).items[0].conversation_id == root
+    async with rows.archive.transaction(rows.session) as current:
+        with pytest.raises(ArchiveNotFound):
+            await rows.service(current).get(root)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "outcome", ["pending", "running", "cancelled", "failed", "interrupted"]
+)
+async def test_t10_discovery_run_eligibility_without_metadata_change(
+    conversation_cases, outcome
+):
+    rows = conversation_cases
+    root = uuid.UUID(rows.conversation)
+    before = rows.actor(
+        "SELECT conversation_version,updated_at FROM archive.conversations"
+    ).stdout
+    rows.actor(
+        rows.run_sql() + ";UPDATE runtime.model_runs SET cancellation_requested=true"
+    )
+    rows.actor(rows.run_sql(str(uuid.uuid7()), "standalone"))
+    if outcome == "running":
+        rows.actor(rows.running_sql(), role="worker")
+    elif outcome != "pending":
+        rows.actor(rows.finish_sql(outcome), role="worker")
+    async with rows.archive.transaction(rows.session) as unit:
+        detail = await rows.service(unit).get(root)
+        assert detail.active_run_id == (
+            uuid.UUID(rows.run) if outcome in ("pending", "running") else None
+        )
+        assert (await rows.service(unit).latest_active()).conversation_id == root
+    assert (
+        rows.actor(
+            "SELECT conversation_version,updated_at FROM archive.conversations"
+        ).stdout
+        == before
+    )
+
+
+@pytest.mark.asyncio
+async def test_t10_keysets_history_append_and_fence_pagination(conversation_cases):
+    rows = conversation_cases
+    roots = []
+    async with rows.archive.transaction(rows.session, write=True) as unit:
+        fixed = ConversationService(
+            unit.conversations,
+            unit.projects,
+            FixedArchiveClock(datetime.now(UTC) + timedelta(days=1)),
+            UUID7IDs(),
+        )
+        for i in range(5):
+            roots.append(await fixed.create(ConversationCreate(title=f"synthetic {i}")))
+        for i in range(3):
+            await rows.projects(unit).create(ProjectCreate(name=f"synthetic {i}"))
+    rows.fence(roots[2].conversation_id)
+    async with rows.archive.transaction(rows.session) as unit:
+        service = rows.service(unit)
+        page = await service.list(2)
+        seen = list(page.items)
+        while page.next_boundary is not None:
+            page = await service.list(1, page.next_boundary)
+            seen.extend(page.items)
+        assert len(seen) == 5 and len({c.conversation_id for c in seen}) == 5
+        assert roots[2].conversation_id not in {c.conversation_id for c in seen}
+        assert seen == sorted(
+            seen, key=lambda c: (c.updated_at, c.conversation_id), reverse=True
+        )
+        assert len({c.updated_at for c in seen[:-1]}) == 1
+        assert [c.conversation_id for c in seen[:-1]] == sorted(
+            [c.conversation_id for c in seen[:-1]], reverse=True
+        )
+        boundary = ListingBoundary(seen[-1].updated_at, seen[-1].conversation_id)
+        assert (await service.list(2, boundary)).items == ()
+        assert (
+            await service.list(
+                2, ListingBoundary(datetime(2099, 1, 1, tzinfo=UTC), uuid.uuid7())
+            )
+        ).items
+        projects = await rows.projects(unit).list(2)
+        rest = await rows.projects(unit).list(200, projects.next_boundary)
+        assert len(projects.items) + len(rest.items) == 4
+        assert [p.project_id for p in (*projects.items, *rest.items)] == [
+            p.project_id
+            for p in sorted(
+                (*projects.items, *rest.items),
+                key=lambda p: (p.created_at, p.project_id),
+                reverse=True,
+            )
+        ]
+        removed_boundary = (await service.list(2)).next_boundary
+    rows.database.sql(
+        f"DELETE FROM archive.conversations WHERE conversation_id='{removed_boundary.identity}'"
+    )
+    async with rows.archive.transaction(rows.session) as unit:
+        assert (await rows.service(unit).list(200, removed_boundary)).items
+    for ordinal in range(2, 7):
+        rows.actor(rows.message_sql(ordinal))
+    async with rows.archive.transaction(rows.session) as unit:
+        recent = await rows.service(unit).history(uuid.UUID(rows.conversation), 2)
+        assert [m.ordinal for m in recent.items] == [5, 6] and recent.next_boundary == 5
+    rows.actor(rows.message_sql(7))
+    async with rows.archive.transaction(rows.session) as unit:
+        older = await rows.service(unit).history(
+            uuid.UUID(rows.conversation), 3, recent.next_boundary
+        )
+        assert [m.ordinal for m in older.items] == [
+            2,
+            3,
+            4,
+        ] and older.next_boundary == 2
+        oldest = await rows.service(unit).history(
+            uuid.UUID(rows.conversation), 500, older.next_boundary
+        )
+        assert [m.ordinal for m in oldest.items] == [1] and oldest.next_boundary is None
+        assert (
+            await rows.service(unit).history(uuid.UUID(rows.conversation), 1, 1)
+        ).items == ()
+
+
+@pytest.mark.asyncio
+async def test_t10_failure_rollback_and_missing_visibility_dependency(
+    conversation_cases,
+):
+    rows = conversation_cases
+    root = uuid.UUID(rows.conversation)
+    with pytest.raises(RuntimeError):
+        async with rows.archive.transaction(rows.session, write=True) as unit:
+            await rows.service(unit).branch(
+                root,
+                BranchCreate(
+                    mode="after_revision",
+                    source_revision_id=uuid.UUID(rows.revision),
+                    expected_conversation_version=1,
+                    title="must roll back",
+                ),
+            )
+            await rows.service(unit).patch(
+                root,
+                ConversationPatch(
+                    expected_conversation_version=1, title="must roll back"
+                ),
+            )
+            raise RuntimeError("synthetic failure")
+    assert (
+        rows.actor(
+            "SELECT conversation_version FROM archive.conversations"
+        ).stdout.strip()
+        == "1"
+    )
+    assert rows.actor(
+        "SELECT count(*) FROM archive.conversations; SELECT count(*) FROM archive.conversation_branch_revisions"
+    ).stdout.splitlines() == ["1", "0"]
+    # Read-only transactions reject attempted business writes, with redacted errors.
+    with pytest.raises(ArchiveStorageError) as caught:
+        async with rows.archive.transaction(rows.session) as unit:
+            await rows.service(unit).create(
+                ConversationCreate(title="synthetic private text")
+            )
+    assert "synthetic private text" not in str(caught.value)
+    # Revoke a required SELECT inside a privileged disposable fixture; absent
+    # runtime visibility access must be an error, never null/empty success.
+    for table in ("conversation_deletion_fences", "deletion_controls", "model_runs"):
+        rows.database.sql(f"REVOKE SELECT ON runtime.{table} FROM mimir_api")
+        try:
+            with pytest.raises(ArchiveStorageError):
+                async with rows.archive.transaction(rows.session) as unit:
+                    await rows.service(unit).get(root)
+        finally:
+            rows.database.sql(f"GRANT SELECT ON runtime.{table} TO mimir_api")
+
+
+@pytest.mark.asyncio
+async def test_t10_waiting_branch_uses_post_lock_parent_project_and_history(
+    conversation_cases,
+):
+    rows = conversation_cases
+    root = uuid.UUID(rows.conversation)
+    revision = uuid.uuid7()
+    pending = None
+    try:
+        async with rows.archive.transaction(rows.session, write=True) as writer:
+            project = await rows.projects(writer).create(
+                ProjectCreate(name="new parent project")
+            )
+            await rows.service(writer).patch(
+                root,
+                ConversationPatch(
+                    expected_conversation_version=1, project_id=project.project_id
+                ),
+            )
+            for statement in rows.message_sql(2, revision=str(revision)).split(";"):
+                await writer.connection.exec_driver_sql(statement)
+
+            async def create_waiting_branch():
+                async with rows.archive.transaction(rows.session, write=True) as unit:
+                    return await rows.service(unit).branch(
+                        root,
+                        BranchCreate(
+                            mode="after_revision",
+                            source_revision_id=revision,
+                            expected_conversation_version=2,
+                            title="waited branch",
+                        ),
+                    )
+
+            pending = asyncio.create_task(create_waiting_branch())
+            await rows.wait_for_api_lock()
+        branch = await asyncio.wait_for(pending, timeout=10)
+        assert branch.project_id == project.project_id
+        async with rows.archive.transaction(rows.session) as unit:
+            history = await rows.service(unit).history(branch.conversation_id)
+            assert [m.revision_id for m in history.items] == [
+                uuid.UUID(rows.revision),
+                revision,
+            ]
+    finally:
+        if pending is not None and not pending.done():
+            pending.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await pending
+
+
+@pytest.mark.asyncio
+async def test_t10_archive_selection_project_metadata_and_monotonic_clock(
+    conversation_cases,
+):
+    rows = conversation_cases
+    root = uuid.UUID(rows.conversation)
+    async with rows.archive.transaction(rows.session, write=True) as unit:
+        service = rows.service(unit)
+        project = await rows.projects(unit).patch(
+            uuid.UUID(rows.project),
+            ProjectPatch(
+                name="renamed", description="synthetic description", status="archived"
+            ),
+        )
+        assert project.name == "renamed" and project.status == "archived"
+        project = await rows.projects(unit).patch(
+            project.project_id, ProjectPatch(description=None)
+        )
+        assert project.description is None
+        assert (
+            await rows.projects(unit).patch(project.project_id, ProjectPatch())
+            == project
+        )
+        archived = await service.patch(
+            root, ConversationPatch(expected_conversation_version=1, status="archived")
+        )
+        assert await service.latest_active() is None
+        assert (await service.get(root)).status == "archived"
+        assert len((await service.history(root)).items) == 1
+        assert (await service.list()).items[0] == archived
+        old_clock = ConversationService(
+            unit.conversations,
+            unit.projects,
+            FixedArchiveClock(archived.updated_at - timedelta(days=1)),
+            UUID7IDs(),
+        )
+        restored = await old_clock.patch(
+            root, ConversationPatch(expected_conversation_version=2, status="active")
+        )
+        assert (
+            restored.updated_at == archived.updated_at
+            and restored.conversation_version == 3
+        )
+        assert (await service.latest_active()).conversation_id == root
+        assert (
+            await service.patch(
+                root, ConversationPatch(expected_conversation_version=3)
+            )
+            == restored
+        )
