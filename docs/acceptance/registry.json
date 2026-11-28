@@ -1068,6 +1068,44 @@
         "tests/contracts/test_remediation.py"
       ],
       "evidence": "docs/verification/S01_SECOND_REMEDIATION.md; new R4 lifecycle regression/audit and R5 dependency-prose correction; R1\u2013R3 preserved. Runtime conformance, renewed review, human approval and external owner dispositions remain pending."
+    },
+    "T10": {
+      "specification": "backend/milestones/T10_conversation-domain.md",
+      "requirements": [
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-01"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-02"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-04"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-05"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "DB-07"
+        },
+        {
+          "source": "backend/ACCEPTANCE_TESTS.md",
+          "id": "PROJECT-MOVE-01"
+        },
+        {
+          "source": "docs/acceptance/REQUIREMENTS.md",
+          "id": "LIFECYCLE-02"
+        }
+      ],
+      "tests": [
+        "backend/tests/test_conversations.py",
+        "tests/integration/test_database.py"
+      ],
+      "evidence": "Owner-authorized T10 domain and V008 established-fence foundation. T10 PR records commands, real PostgreSQL results and submitted SHA; TRACEABILITY.md maps scoped coverage. HTTP/cursors/idempotency, production fence writers, deletion coordination/cleanup and restore replay remain later tasks. Normative requirement ownership/status are unchanged."
     }
   }
 }

@@ -13,6 +13,28 @@ Mandatory matrix columns: `requirement ID | normative source | implementation ow
 
 Examples to seed the matrix (not test-pass claims): auth/session renewal → T24/CLI-04; conversation reassignment → T25/CLI-05; idempotent creation → T26/CLI-05; accepted-op recovery → T23/CLI-07; SSE/status/cancel reconciliation → T27/CLI-14/CLI-15; account deletion fences → T35; restore safety → T37; cross-tenant memory isolation → T31/T34.
 
+## T10 scoped archive and visibility verification
+
+The owner authorized the T10 fence foundation and these protected-document updates.
+The [physical proposal](docs/decisions/T10_CONVERSATION_VISIBILITY.md) was recorded
+before V008 implementation (V007 already belongs to merged T09). Public contracts
+and normative requirement ownership remain unchanged.
+
+| requirement ID | normative source | implementation owner task | automated test path | fake/integration/e2e | status | last verified commit | evidence |
+|---|---|---|---|---|---|---|---|
+| `DB-02` | backend/ACCEPTANCE_TESTS.md | T10 supporting domain boundary | backend/tests/test_conversations.py; tests/integration/test_database.py | unit/integration | Candidate; results in T10 PR | Submitted SHA in PR | Owner/project/revision rejection, API/worker FORCE RLS, missing actor, reused connection, grant denial |
+| `DB-04` | backend/ACCEPTANCE_TESTS.md | T10 | tests/integration/test_database.py | integration | Candidate; results in T10 PR | Submitted SHA in PR | Nested exact inherited prefixes, both branch modes, zero prefix, no inherited text copying or runtime work |
+| `DB-05` | backend/ACCEPTANCE_TESTS.md | T10 supporting metadata boundary | tests/integration/test_database.py | integration | Candidate; results in T10 PR | Submitted SHA in PR | Competing version-guarded metadata commits; parent-locked branch snapshots; T12 message concurrency and T36 purge coordination remain deferred |
+| `PROJECT-MOVE-01` | backend/ACCEPTANCE_TESTS.md | T10 implementation; T25 verification | tests/integration/test_database.py | integration | Candidate; results in T10 PR | Submitted SHA in PR | Reassign/unassign, stale versions, no-op timestamps, preserved revisions/child project/ingestion provenance |
+| `DB-07; LIFECYCLE-02` | backend/ACCEPTANCE_TESTS.md; docs/acceptance/REQUIREMENTS.md | T10 foundation; T36 workflow | tests/integration/test_database.py | integration | Foundation only | Submitted SHA in PR | Established direct/inherited fences, unaffected siblings, concealed detail/run/history, listing/keysets and mutation denial; production acceptance/coordination/cleanup/restore unimplemented |
+| `S01-DISCOVERY; S01-PAGE` | contracts/HTTP_SEMANTICS.md | T10 domain; T11 HTTP | tests/integration/test_database.py | integration | Domain only | Submitted SHA in PR | Snapshot-consistent eligibility/metadata/derived run, requested cancellation eligibility, terminal/standalone exclusion, typed exclusive keysets and ascending flattened history |
+
+T10 does not claim HTTP producer/cursor/idempotency conformance, atomic message/run
+submission/finalization, production fence establishment, deletion orchestration,
+purge concurrency or journal/restore safety. T11/T12/T16/T35/T36/T37 retain these
+tasks. No fixture/static check substitutes for runtime proof. Literal commands,
+counts, environment, limitations and exact submitted commit are recorded in its PR.
+
 ## T09 scoped auth HTTP verification
 
 The owner authorized this entry through the T09-R2 review remediation. The

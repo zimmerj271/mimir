@@ -54,6 +54,25 @@ rules supersede inconsistent message-state wording in earlier design inputs.
   manifest. Contract modification/validation requires separate authorization through
   established S01 governance before public producers/consumers implement it.
 
+## Owner-approved T10 conversation fence foundation
+
+The owner authorized a separate persistent root conversation fence, inherited
+through immutable descendant links, with owner integrity, forced RLS and runtime
+read-only grants. T10 owns established-fence visibility for detail/discovery,
+lists/latest-active/history, metadata/project changes and branches. This is
+distinct from V005 account deletion controls. A requested account deletion alone
+is not an established fence; established controls and current inactive accounts
+retain uniform authentication rejection. Visibility dependency failures fail closed.
+
+The physical proposal, privileges, retention and concurrency boundary are in
+[T10 conversation visibility](T10_CONVERSATION_VISIBILITY.md), recorded before
+implementation. Use V008 because merged T09 already owns V007; preserve all prior
+SQL. T35 retains account fence establishment/revocation/purge; T36 retains production
+conversation fencing, atomic deletion acceptance, coordination with all writers,
+run/ingestion cancellation and physical cleanup; T37 retains journal/restore replay.
+No production fence mutation privilege, deletion endpoint, new public status,
+persisted active-run reference or restoration guarantee is added by T10.
+
 ## API and execution
 - Backend-owned versioned OpenAPI 3.1, SSE schema, error catalog, fixtures, checksum, `/api/v1`, semver independently of app; `/api/v1/meta` compatible public discovery. Contract-first S01; no absent public details invented by implementation agents. snake_case JSON, UUIDv7 persistent new IDs, UTC RFC3339, typed errors, exact omission/null rules. Canonical `text/v1` message content **max 1 MiB UTF-8 for user AND assistant**; max generation tokens configured per model; no silent truncation. Projects/conversations page 50 max 200; messages page 100 max 500.
 - Username/password login, Argon2id server verifier; opaque random 256-bit bearer session, server SHA-256 token hash; sliding idle 30d, absolute 90d, **no auth refresh endpoint**. Persistent Linux/macOS OS keyring by default; protected-file fallback opt-in 0700/0600, reject unsafe perms/symlinks; logout locally removes secret regardless of remote revocation outcome.

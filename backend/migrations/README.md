@@ -1,5 +1,33 @@
 # Flyway SQL migrations
 
+## V008 conversation visibility foundation (T10)
+
+T09 already owns V007; V008 is the next forward migration. All prior migrations
+remain unchanged. The [physical proposal](../../docs/decisions/T10_CONVERSATION_VISIBILITY.md)
+was recorded before implementation and defines the owner/root fence table, immutable
+establishment time, restrictive owner/root FK, ENABLE/FORCE RLS, SELECT-only
+API/worker grants and invoker-rights visible-conversation view. Roots and descendants
+are concealed without changing public statuses, archive content or activity dates.
+An account control is established only after fencing; requested alone is allowed.
+
+No production fence writer, deletion endpoint, lifecycle states, expiry, DELETE
+grant, account/session orchestration, physical cleanup or restore guarantee is
+delivered. T35/T36/T37 retain these obligations. T36 must coordinate future writers
+and retain independent deletion evidence when removing the root/fence/subtree.
+
+`make database-check` includes real V008 fresh/repeat/restart/validate, V007 upgrade,
+failed candidate rollback/recovery and drift detection, plus domain/RLS/visibility
+tests. Actual counts and the submitted SHA belong to the T10 PR. Privileged test
+fixtures establish fences only in unique disposable stacks.
+
+If unapplied V008 fails, serving remains closed; verify history/data through V007
+and absence of partially created V008 objects, correct only the unapplied candidate,
+rerun migrate explicitly and validate. After application, a source revert is not
+a database rollback: preserve history and fences, stop the candidate application,
+and use a separately reviewed forward correction or coordinated offline restore
+with T37 journal replay. Never clean, repair, baseline, downgrade applied SQL or
+delete retained volumes to recover.
+
 ## V006 restricted authentication operations (T08)
 
 The owner explicitly authorized V006 during the T08 assignment. It adds five
