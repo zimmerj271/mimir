@@ -590,7 +590,7 @@ class ContractTests(unittest.TestCase):
         for case in read_json(ROOT / "contracts/fixtures/auth-cases.json"):
             allowed, status, code = auth_outcome(case["facts"])
             self.assertEqual(allowed, case["allowed"])
-            if "http_status" in case:
+            if not allowed:
                 self.assertEqual(
                     (status, code), (case["http_status"], case["error_code"])
                 )

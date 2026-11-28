@@ -123,7 +123,7 @@ def auth_outcome(case: dict[str, Any]) -> tuple[bool, int | None, str | None]:
     client = case.get("client_type") if login else case.get("stored_client_type")
     if login:
         if authorization or (client == "cli" and cookies):
-            return False, None, None  # rejection approved; no new status decision
+            return False, 400, "ambiguous_credentials"
     elif (
         authorization + cookies != 1
         or not case.get("credential_valid", True)
@@ -132,14 +132,14 @@ def auth_outcome(case: dict[str, Any]) -> tuple[bool, int | None, str | None]:
         return False, 401, "unauthenticated"
     browser = client == "web"
     if not case.get("trusted_host", True):
-        return False, None, None
+        return False, 403, "forbidden"
     if browser and not case.get("https", False):
-        return False, None, None
+        return False, 403, "forbidden"
     if (
         case.get("has_json_body", False)
         and case.get("content_type") != "application/json"
-    ):
-        return False, None, None
+    ) or case.get("body_parse_error") in {"malformed_json", "invalid_utf8"}:
+        return False, 422, "invalid_request"
     if browser:
         if case.get("mutation", False):
             if (
@@ -148,7 +148,7 @@ def auth_outcome(case: dict[str, Any]) -> tuple[bool, int | None, str | None]:
             ):
                 return False, 403, "forbidden"
         elif case.get("origin") not in (None, "https://browser.invalid"):
-            return False, None, None
+            return False, 403, "forbidden"
     return True, None, None
 
 

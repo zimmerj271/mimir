@@ -64,6 +64,24 @@ passwords, Authorization or cookie values in diagnostics, committed fixtures or
 errors. Schema examples omit credential values; ephemeral harness values are not
 usable sessions. Runtime enforcement belongs to T09/T24/T20/T28.
 
+### Owner-approved T09-R1 error handling
+
+Login carrying Authorization, and CLI login carrying the Mimir session cookie,
+return 400 `ambiguous_credentials`. An untrusted Host, insecure browser transport
+or unauthorized Origin on an authenticated browser GET returns 403 `forbidden`.
+Missing, duplicated or non-application/json Content-Type on operations requiring
+a JSON body returns 422 `invalid_request`. Malformed JSON and invalid UTF-8
+request bodies also return 422 `invalid_request`.
+
+These rejections use the canonical Error envelope and existing error catalog.
+Request bodies, credentials and parsing exception details are excluded from error
+responses. JSON media-type and parsing checks on auth/profile body operations
+complete before authenticated principal resolution and implicit renewal.
+Transport and browser security-policy rejection also precedes renewal and profile
+mutation. Translation of parsing failures is confined to request-body decoding.
+Unrelated HTTP exceptions retain their status and headers, and genuine server
+failures retain their server-failure classification.
+
 ## S01-CANCEL — Owner-approved cancellation resolution
 
 `POST /api/v1/runs/{run_id}/cancel` returns the canonical Run schema in both

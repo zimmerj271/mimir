@@ -195,3 +195,19 @@ its version need not match the uv CLI. Development-only contract tooling is
 openapi-spec-validator 0.7.2, jsonschema 4.26.0 and PyYAML 6.0.4, with locked
 compatible transitives. No contract tool enters production runtime dependencies.
 See [contract validation](../contracts/README.md) and [S01 evidence](../docs/verification/S01.md).
+
+## Auth HTTP application
+
+`mimir_backend.auth_http.create_app` constructs the ASGI app. Supply SQLAlchemy
+PostgreSQL/psycopg URLs for `mimir_auth` and `mimir_api` from deployment-managed
+credentials, and the provisioned CLI loopback authority (including its port).
+Browser access additionally requires an exact HTTPS origin. The server must
+supply the actual connection scheme in the ASGI scope and disable forwarded
+header rewriting. The application lifespan owns both database pools.
+
+Apply migrations through V007 before serving the profile routes. V007 adds
+`archive.session_username(uuid)`, executable by the API role, to resolve the
+identity from the authenticated session under transaction-local owner scope.
+An application rollback can leave this additive routine in place. Flyway rolls
+back a failed V007 transaction. Restore the approved migration file and retry
+after correcting the cause of failure.

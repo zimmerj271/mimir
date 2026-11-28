@@ -243,10 +243,14 @@ class AuthService:
             raise AuthenticationRejected("Authentication rejected")
         return IssuedSession(token, session)
 
-    async def authenticate(self, token: str) -> Session:
+    async def authenticate(
+        self, token: str, client_type: ClientType | None = None
+    ) -> Session:
         token_hash = self._tokens.digest(token)
         session = await self._repository.lookup_session(token_hash)
         if session is None or not session.is_active(self._clock.now()):
+            raise AuthenticationRejected("Authentication rejected")
+        if client_type is not None and session.client_type != client_type:
             raise AuthenticationRejected("Authentication rejected")
         # Atomic database revalidation closes lookup/renewal races. A successful
         # preliminary lookup alone is never exposed as an authenticated owner.

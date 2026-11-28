@@ -23,6 +23,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
+import httpx
 import pytest
 import pytest_asyncio
 from sqlalchemy import URL, text
@@ -39,6 +40,7 @@ from mimir_backend.auth import (
     SessionTokens,
     SystemClock,
 )
+from mimir_backend.auth_http import create_app
 from mimir_backend.auth_postgres import (
     AuthDatabase,
     PostgresAuthRepository,
@@ -4584,3 +4586,269 @@ async def test_t08_local_admin_command_real_create_disable(session_services, cap
     output = capsys.readouterr()
     assert services.password not in output.out + output.err
     assert issued.token not in output.out + output.err
+
+
+V007 = "V007__session_profile_username.sql"
+
+
+def test_t09_upgrade_profile_lookup_and_rollback(tmp_path):
+    database = DatabaseStack(tmp_path, through_version=6)
+    try:
+        database.start()
+        database.migrate()
+        owner = AuthRows(database)
+        other = AuthRows(database)
+        owner.seed()
+        other.seed()
+        original = (ROOT / "backend/migrations" / V007).read_bytes()
+        candidate = database.migrations / V007
+        candidate.write_bytes(original + b"\nSELECT 1/0;\n")
+        assert database.flyway("migrate", check=False).returncode != 0
+        assert (
+            database.sql(
+                "SELECT to_regprocedure('archive.session_username(uuid)') IS NULL"
+            ).stdout.strip()
+            == "t"
+        )
+        candidate.write_bytes(original)
+        database.flyway("migrate")
+        database.flyway("validate")
+        lookup = f"SELECT archive.session_username('{owner.identity}')"
+        assert database.sql(lookup, "mimir_api").stdout.strip() == ""
+        assert (
+            database.sql(
+                f"BEGIN; SET LOCAL app.current_user_id='{owner.user}'; {lookup}; COMMIT",
+                "mimir_api",
+            ).stdout.strip()
+            == owner.username
+        )
+        assert (
+            database.sql(
+                f"BEGIN; SET LOCAL app.current_user_id='{other.user}'; {lookup}; COMMIT",
+                "mimir_api",
+            ).stdout.strip()
+            == ""
+        )
+        assert (
+            database.sql(
+                "SELECT username FROM auth.identities", "mimir_api", check=False
+            ).returncode
+            != 0
+        )
+        for role in ("mimir_worker", "mimir_auth", "mimir_maintenance"):
+            assert database.sql(lookup, role, check=False).returncode != 0
+        assert (
+            database.sql(
+                f"BEGIN; SET LOCAL app.current_user_id='{owner.user}'; "
+                f"SET LOCAL row_security=off; SELECT user_id FROM archive.users; COMMIT",
+                "mimir_api",
+                check=False,
+            ).returncode
+            != 0
+        )
+    finally:
+        database.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_t09_http_real_roles_renewal_profile_logout(tmp_path):
+    database = DatabaseStack(tmp_path, through_version=7)
+    try:
+        database.start()
+        database.migrate()
+        database.flyway("validate")
+        services = SessionServices(database)
+        try:
+            await services.seed()
+            second = await services.admin.provision(
+                "other", services.password, "private"
+            )
+            auth_url = services.auth_database.engine.url
+            app = create_app(
+                auth_url=auth_url,
+                api_url=auth_url.set(
+                    username="mimir_api",
+                    password=database.passwords["mimir_api"].read_text().strip(),
+                ),
+                cli_authority="127.0.0.1:8000",
+                browser_origin="https://browser.invalid",
+            )
+            transport = httpx.ASGITransport(app=app)
+            async with (
+                app.router.lifespan_context(app),
+                httpx.AsyncClient(
+                    base_url="http://127.0.0.1:8000/api/v1/",
+                    transport=transport,
+                ) as cli,
+                httpx.AsyncClient(
+                    base_url="https://browser.invalid/api/v1/", transport=transport
+                ) as web,
+            ):
+                login = {"username": services.username, "password": services.password}
+                browser = {"Origin": "https://browser.invalid", "X-Mimir-CSRF": "1"}
+                issued = await cli.post(
+                    "auth/login", json={**login, "client_type": "cli"}
+                )
+                assert issued.status_code == 201
+                assert issued.headers["cache-control"] == "no-store"
+                assert "set-cookie" not in issued.headers
+                token = issued.json()["access_token"]
+                bearer = {"Authorization": f"Bearer {token}"}
+                issued_web = await web.post(
+                    "auth/login", json={**login, "client_type": "web"}, headers=browser
+                )
+                assert issued_web.status_code == 201
+                assert set(issued_web.json()) == {"session"}
+                cookie = issued_web.headers["set-cookie"].lower()
+                assert all(
+                    attr in cookie
+                    for attr in [
+                        "httponly",
+                        "secure",
+                        "samesite=strict",
+                        "path=/",
+                        "max-age=",
+                    ]
+                )
+                assert "domain=" not in cookie
+                assert (await cli.get("users/me")).status_code == 401
+                old = services.seed_session()
+                old_header = {"Authorization": f"Bearer {old}"}
+                reads = await asyncio.gather(
+                    *(cli.get("auth/session", headers=old_header) for _ in range(4))
+                )
+                for res in reads:
+                    assert res.status_code == 200
+                    metadata = res.json()
+                    assert set(metadata) == {
+                        "user_id",
+                        "client_type",
+                        "expires_at",
+                        "absolute_expires_at",
+                    }
+                    assert datetime.fromisoformat(
+                        metadata["expires_at"]
+                    ) > datetime.now(UTC) + timedelta(days=29)
+                profile = {
+                    "user_id": str(services.user),
+                    "username": services.username,
+                    "display_name": None,
+                }
+                assert (await web.get("users/me")).json() == profile
+                assert (await cli.get("users/me", headers=bearer)).json() == profile
+                session_state_sql = (
+                    "SELECT client_type,last_used_at,expires_at,revoked_at "
+                    f"FROM auth.sessions WHERE user_id='{services.user}' "
+                    "ORDER BY client_type,created_at"
+                )
+                session_state = database.sql(session_state_sql).stdout
+                rejected = [
+                    await web.patch("users/me", json={"display_name": "wrong"}),
+                    await web.patch(
+                        "users/me",
+                        json={"display_name": "wrong"},
+                        headers={**browser, "Origin": "https://other.invalid"},
+                    ),
+                    await web.patch(
+                        "users/me",
+                        json={"display_name": "wrong"},
+                        headers={**browser, "Host": "untrusted.invalid"},
+                    ),
+                ]
+                for response in rejected:
+                    assert response.status_code == 403
+                    assert response.json()["error"]["code"] == "forbidden"
+                rejected_bodies = [
+                    (b'{"display_name":"wrong"}', "application/problem+json"),
+                    (b'{"display_name":"wrong"', "application/json"),
+                    (b'{"display_name":"wrong\xff"}', "application/json"),
+                ]
+                for encoding in (
+                    "utf-16-le",
+                    "utf-16-be",
+                    "utf-32-le",
+                    "utf-32-be",
+                    "utf-16",
+                    "utf-32",
+                ):
+                    rejected_bodies.append(
+                        (
+                            json.dumps({"display_name": "wrong"}).encode(encoding),
+                            "application/json",
+                        )
+                    )
+                    for client, kind, headers in [
+                        (cli, "cli", {}),
+                        (web, "web", browser),
+                    ]:
+                        response = await client.post(
+                            "auth/login",
+                            content=json.dumps({**login, "client_type": kind}).encode(
+                                encoding
+                            ),
+                            headers={**headers, "Content-Type": "application/json"},
+                        )
+                        assert response.status_code == 422
+                        assert response.json()["error"]["code"] == "invalid_request"
+                for content, media_type in rejected_bodies:
+                    for client, headers in [(cli, bearer), (web, browser)]:
+                        response = await client.patch(
+                            "users/me",
+                            content=content,
+                            headers={**headers, "Content-Type": media_type},
+                        )
+                        assert response.status_code == 422
+                        assert response.json()["error"]["code"] == "invalid_request"
+                assert database.sql(session_state_sql).stdout == session_state
+                assert (
+                    database.sql(
+                        f"SELECT display_name IS NULL FROM archive.users WHERE user_id='{services.user}'"
+                    ).stdout.strip()
+                    == "t"
+                )
+
+                profile["display_name"] = "updated é 世界 😀"
+                assert (
+                    await web.patch(
+                        "users/me",
+                        json={"display_name": profile["display_name"]},
+                        headers=browser,
+                    )
+                ).json() == profile
+                assert (
+                    await cli.patch("users/me", json={}, headers=bearer)
+                ).json() == profile
+                assert (
+                    await cli.patch(
+                        "users/me", json={"user_id": str(second)}, headers=bearer
+                    )
+                ).status_code == 422
+                profile["display_name"] = None
+                assert (
+                    await cli.patch(
+                        "users/me", json={"display_name": None}, headers=bearer
+                    )
+                ).json() == profile
+                assert (
+                    database.sql(
+                        f"SELECT display_name FROM archive.users WHERE user_id='{second}'"
+                    ).stdout.strip()
+                    == "private"
+                )
+                assert (
+                    await web.get("auth/session", headers=bearer)
+                ).status_code == 400
+                logged_out = await web.post("auth/logout", headers=browser)
+                assert logged_out.status_code == 204 and not logged_out.content
+                assert "max-age=0" in logged_out.headers["set-cookie"].lower()
+                assert (await web.get("auth/session")).status_code == 401
+                assert (
+                    await cli.post("auth/logout", headers=bearer)
+                ).status_code == 204
+                assert (
+                    await cli.get("auth/session", headers=bearer)
+                ).status_code == 401
+        finally:
+            await services.close()
+    finally:
+        database.cleanup()
